@@ -63,6 +63,18 @@ class TestCli(unittest.TestCase):
         store = Store(self.db)
         self.assertEqual(store.get_opportunity(opp_id).status, "DISCOVERED")
 
+    def test_know_supersede(self):
+        self._run("know", "add", "--type", "pricing", "--source", "old", "--content", "stale fact")
+        self._run("know", "add", "--type", "pricing", "--source", "new", "--content", "fresh fact")
+        store = Store(self.db)
+        by_source = {store.get_knowledge(r["id"]).source: r["id"]
+                     for r in store.conn.execute("SELECT id FROM knowledge")}
+        old_id, new_id = by_source["old"], by_source["new"]
+        self._run("know", "supersede", old_id, new_id)
+        store = Store(self.db)
+        self.assertEqual(store.get_knowledge(old_id).superseded_by, new_id)
+        self.assertEqual(len(store.events_of_type("KNOWLEDGE_SUPERSEDED", old_id)), 1)
+
     def test_launch_creates_product(self):
         self._run("venue", "add", "--name", "v")
         self._run("seed", "--title", "launchable")

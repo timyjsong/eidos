@@ -120,6 +120,25 @@ def cmd_know_add(store, args):
     print(record.id)
 
 
+def cmd_know_list(store, args):
+    rows = store.conn.execute("SELECT id FROM knowledge ORDER BY id")
+    for row in rows:
+        record = store.get_knowledge(row["id"])
+        stale = f" [SUPERSEDED by {record.superseded_by}]" if record.superseded_by else ""
+        print(f"{record.id}  {record.type:<24} conf={record.confidence}{stale}  {record.content[:80]}")
+
+
+def cmd_know_supersede(store, args):
+    old = store.get_knowledge(args.old_id)
+    new = store.get_knowledge(args.new_id)
+    if old is None or new is None:
+        raise SystemExit("both knowledge records must exist")
+    old.superseded_by = new.id
+    store.save_knowledge(old)
+    store.emit(ev.KNOWLEDGE_SUPERSEDED, args.actor or _human(), old.id, {"by": new.id})
+    print(f"{old.id} superseded by {new.id}")
+
+
 def cmd_score_set(store, args):
     opp = store.get_opportunity(args.id)
     if opp is None:
@@ -254,6 +273,12 @@ def build_parser():
     p.add_argument("--confidence", type=float)
     p.add_argument("--actor")
     p.set_defaults(func=cmd_know_add)
+    know.add_parser("list").set_defaults(func=cmd_know_list)
+    p = know.add_parser("supersede")
+    p.add_argument("old_id")
+    p.add_argument("new_id")
+    p.add_argument("--actor")
+    p.set_defaults(func=cmd_know_supersede)
 
     score = sub.add_parser("score").add_subparsers(dest="sub", required=True)
     p = score.add_parser("set")
