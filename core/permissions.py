@@ -1,4 +1,5 @@
 """Permission governance: tier + action allowlist per worker type. Denials are events."""
+from . import event_types as ev
 from .schemas import PermissionPolicy
 
 TIER_NAMES = {
@@ -20,7 +21,7 @@ def register_policy(store, worker_type, tier, allowed_actions, actor="system"):
     policy = PermissionPolicy(worker_type=worker_type, tier=tier,
                               allowed_actions=list(allowed_actions))
     store.save_policy(policy)
-    store.emit("PERMISSION_POLICY_SET", actor, worker_type,
+    store.emit(ev.PERMISSION_POLICY_SET, actor, worker_type,
                {"tier": tier, "allowed_actions": list(allowed_actions)})
     return policy
 
@@ -35,6 +36,6 @@ def check(store, worker_type, action, required_tier):
         denial = f"action {action!r} not in allowed_actions"
     else:
         return True
-    store.emit("PERMISSION_DENIED", worker_type, worker_type,
+    store.emit(ev.PERMISSION_DENIED, worker_type, worker_type,
                {"action": action, "required_tier": required_tier, "why": denial})
     raise PermissionDenied(f"{worker_type}: {denial}")

@@ -7,11 +7,13 @@ import sqlite3
 
 from .schemas import (
     Budget,
+    Directive,
     Event,
     KnowledgeRecord,
     Opportunity,
     PermissionPolicy,
     Product,
+    Venue,
     WorkerRun,
 )
 
@@ -28,6 +30,10 @@ CREATE TABLE IF NOT EXISTS permission_policies (
   worker_type TEXT PRIMARY KEY, doc TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS worker_runs (
   id TEXT PRIMARY KEY, worker_type TEXT NOT NULL, opportunity_id TEXT, doc TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS venues (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, doc TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS directives (
+  id TEXT PRIMARY KEY, status TEXT NOT NULL, doc TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS events (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
   id TEXT NOT NULL UNIQUE,
@@ -153,6 +159,27 @@ class Store:
 
     def get_policy(self, worker_type):
         return self._get_doc("permission_policies", "worker_type", worker_type, PermissionPolicy)
+
+    def save_venue(self, venue):
+        self._upsert("venues", ["id", "name"], [venue.id, venue.name], venue.to_doc())
+
+    def get_venue(self, venue_id):
+        return self._get_doc("venues", "id", venue_id, Venue)
+
+    def list_venues(self):
+        rows = self.conn.execute("SELECT doc FROM venues ORDER BY id")
+        return [Venue.from_doc(json.loads(r["doc"])) for r in rows]
+
+    def save_directive(self, directive):
+        self._upsert("directives", ["id", "status"],
+                     [directive.id, directive.status], directive.to_doc())
+
+    def get_directive(self, directive_id):
+        return self._get_doc("directives", "id", directive_id, Directive)
+
+    def list_directives(self):
+        rows = self.conn.execute("SELECT doc FROM directives ORDER BY id")
+        return [Directive.from_doc(json.loads(r["doc"])) for r in rows]
 
     def save_run(self, run):
         self._upsert("worker_runs", ["id", "worker_type", "opportunity_id"],

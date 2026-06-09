@@ -1,19 +1,19 @@
-"""Spike: run fake opportunities through the governed pipeline end to end.
+"""Spike: run fake opportunities through the governed v0.3 pipeline end to end.
 
-Demonstrates every milestone component working together:
-state machine, registries, event log, budgets, permissions, worker runs, orchestrator.
+Demonstrates: venue + directive entry, decision-phase lifecycle, human gates,
+reserve/settle budgets, the launch seam (opportunity -> product), reopen guard,
+hold/resume, and full history reconstruction from events.
 
-All workers here are deterministic stubs and live outside core/ on purpose —
-workers are replaceable implementation details.
+All workers are deterministic stubs and live outside core/ on purpose.
 
-Run: python3 spike.py
+Run: .venv/bin/python spike.py  (or python3 spike.py)
 """
 import os
 
 from core import budget as budgets
 from core import permissions, state_machine
-from core.orchestrator import Orchestrator, WorkerResult
-from core.schemas import KnowledgeRecord, Opportunity, now_iso
+from core.orchestrator import Orchestrator, WorkerResult, launch_product
+from core.schemas import Directive, KnowledgeRecord, Opportunity, Venue, now_iso
 from core.store import Store
 
 DB = "spike.db"
@@ -29,70 +29,71 @@ class StubWorker:
         self.required_tier = required_tier
 
 
-class Classifier(StubWorker):
-    def __init__(self):
-        super().__init__("signal_classifier", "classify_signals", 1)
-
-    def run(self, opp):
-        return WorkerResult(
-            output={"discovery": {"clusters": ["seller-productivity"]}},
-            cost_usd=0.18, tokens_in=900, tokens_out=140,
-        )
-
-
-class Vetter(StubWorker):
-    """Returns knowledge records as output; the orchestrator persists them."""
+class Triage(StubWorker):
+    """Classify + vet in one phase; returns knowledge the platform persists."""
 
     def __init__(self):
-        super().__init__("vetting_agent", "vet_market", 1)
+        super().__init__("triage_agent", "triage_signals", 1)
 
     def run(self, opp):
         observed = now_iso()
         records = [
             KnowledgeRecord(type="competitor_observation", source="marketplace_search",
-                            content=f"3 weak competitors found for '{opp.title}'",
-                            confidence=0.7, observed_at=observed),
+                            content=f"3 weak competitors for '{opp.title}'",
+                            tags=["competition"], confidence=0.7, observed_at=observed),
             KnowledgeRecord(type="marketplace_research", source="forum_scrape",
                             content=f"recurring complaints adjacent to '{opp.title}'",
-                            confidence=0.6, observed_at=observed),
+                            tags=["pain"], confidence=0.6, observed_at=observed),
         ]
         return WorkerResult(
-            output={
-                "knowledge": records,
-                "discovery": {"sources": [r.id for r in records]},
-            },
-            cost_usd=0.22, tokens_in=2100, tokens_out=300,
-        )
+            output={"knowledge": records,
+                    "discovery": {"clusters": ["seller-productivity"],
+                                  "sources": [r.id for r in records]}},
+            cost_usd=0.20, tokens_in=2100, tokens_out=300)
 
 
 class Evaluator(StubWorker):
-    """Scores deterministically by title; evidence refs point at vetted knowledge."""
-
     def __init__(self):
         super().__init__("evaluator", "score_opportunity", 2)
 
     def run(self, opp):
-        weak = "logo" in opp.title.lower()
-        value = 2.0 if weak else 7.5
+        value = 2.0 if "logo" in opp.title.lower() else 7.5
         evidence = list(opp.discovery.get("sources", []))
-        scores = {
-            dim: {"value": value, "confidence": 0.6,
-                  "rationale": "stub heuristic", "evidence": evidence}
-            for dim in ("pain", "market", "distribution", "cost", "risk")
-        }
+        scores = {dim: {"value": value, "confidence": 0.6,
+                        "rationale": "stub heuristic", "evidence": evidence}
+                  for dim in ("pain", "market", "distribution", "cost", "risk")}
         return WorkerResult(output={"scores": scores},
                             cost_usd=0.21, tokens_in=1500, tokens_out=250)
 
 
-class ProblemValidator(StubWorker):
+class Validator(StubWorker):
     def __init__(self):
-        super().__init__("problem_validator", "validate_problem", 1)
+        super().__init__("validator", "validate_opportunity", 1)
 
     def run(self, opp):
         return WorkerResult(
-            output={"execution": {"scope": {"problem_validated_note": "stub: pain confirmed"}}},
-            cost_usd=0.2, tokens_in=1200, tokens_out=180,
-        )
+            output={"validation": {"problem": True, "market": True, "distribution": True}},
+            cost_usd=0.20, tokens_in=1200, tokens_out=180)
+
+
+class Builder(StubWorker):
+    def __init__(self):
+        super().__init__("builder", "build_product", 3)
+
+    def run(self, opp):
+        return WorkerResult(
+            output={"execution": {"build_outputs": ["stub: repo + listing draft"]}},
+            cost_usd=0.22, tokens_in=3000, tokens_out=900)
+
+
+class ReleaseChecker(StubWorker):
+    def __init__(self):
+        super().__init__("release_checker", "check_release_bar", 1)
+
+    def run(self, opp):
+        return WorkerResult(
+            output={"execution": {"qa_outputs": ["stub: venue release bar passed"]}},
+            cost_usd=0.18, tokens_in=900, tokens_out=140)
 
 
 def banner(text):
@@ -104,30 +105,47 @@ def main():
         os.remove(DB)  # spike sandbox only — platform data is never deleted
     store = Store(DB)
 
-    # Governance first: policies and a research budget.
+    # Governance first.
     for worker_type, action, tier in [
-        ("signal_classifier", "classify_signals", 1),
-        ("vetting_agent", "vet_market", 1),
+        ("triage_agent", "triage_signals", 1),
         ("evaluator", "score_opportunity", 2),
-        ("problem_validator", "validate_problem", 1),
+        ("validator", "validate_opportunity", 1),
+        ("builder", "build_product", 3),
+        ("release_checker", "check_release_bar", 1),
         ("launch_bot", "publish_listing", 2),  # deliberately under-tiered
     ]:
         permissions.register_policy(store, worker_type, tier, [action])
-    research = budgets.create_budget(store, "research", 1.85)
+    research = budgets.create_budget(store, "research", 1.55)
+
+    # Venue-first entry: a venue, a directive, opportunities under it.
+    venue = Venue(name="Shopify App Store", kind="marketplace",
+                  profile={"distribution": {"mechanic": "store search"},
+                           "monetization": {"rev_share": 0.0},
+                           "gatekeeping": {"review_days": 5},
+                           "cost_benchmarks": {}})
+    store.save_venue(venue)
+    directive = Directive(prompt="explore seller-productivity gaps on the Shopify App Store",
+                          venues=[venue.id], budget_id=research.id)
+    store.save_directive(directive)
 
     orch = Orchestrator(store, research.id)
-    orch.register("DISCOVERED", Classifier(), "CLASSIFIED")
-    orch.register("CLASSIFIED", Vetter(), "VETTED")
-    orch.register("VETTED", Evaluator(), "EVALUATED")
-    orch.register("APPROVED", ProblemValidator(), "PROBLEM_VALIDATED")
-    # No route for EVALUATED: approval is a human boundary, the pipeline halts there.
+    orch.register("DISCOVERED", Triage(), "TRIAGED")
+    orch.register("TRIAGED", Evaluator(), "EVALUATED")
+    orch.register("APPROVED", Validator(), "VALIDATED")
+    orch.register("VALIDATED", Builder(), "BUILDING")
+    orch.register("BUILDING", ReleaseChecker(), "READY")
+    # No routes for EVALUATED or READY: approval and launch are human boundaries.
 
-    opp_a = Opportunity(title="Shopify review-reply autoresponder", platform="shopify")
-    opp_b = Opportunity(title="AI logo generator #4912", platform="web")
-    opp_c = Opportunity(title="Etsy fee calculator", platform="etsy")
+    opp_a = Opportunity(title="Shopify review-reply autoresponder",
+                        directive_id=directive.id, signal_venues=[venue.id])
+    opp_b = Opportunity(title="AI logo generator #4912",
+                        directive_id=directive.id, signal_venues=[venue.id])
+    opp_c = Opportunity(title="Etsy fee calculator",
+                        directive_id=directive.id, signal_venues=[venue.id])
     for opp in (opp_a, opp_b, opp_c):
         store.save_opportunity(opp)
-        store.emit("OPPORTUNITY_CREATED", "signal_harvester", opp.id, {"title": opp.title})
+        store.emit("OPPORTUNITY_CREATED", "triage_agent", opp.id,
+                   {"title": opp.title, "directive_id": directive.id})
 
     banner("Illegal transition attempt (DISCOVERED -> LAUNCHED)")
     try:
@@ -142,34 +160,54 @@ def main():
     except permissions.PermissionDenied as e:
         print(f"DENIED as expected: {e}")
 
-    banner("Pipeline: A and B run until the human approval gate")
+    banner("Pipeline: A and B run to the human approval gate")
     print(f"A trace: {orch.run_pipeline(opp_a.id)}")
     print(f"B trace: {orch.run_pipeline(opp_b.id)}")
 
-    banner("Human decisions at the gate (the primary human decision point)")
+    banner("Human decisions at the gate")
     a = store.get_opportunity(opp_a.id)
-    print(f"A scores: pain={a.scores['pain'].value} evidence={a.scores['pain'].evidence}")
+    print(f"A pain={a.scores['pain'].value} evidence={a.scores['pain'].evidence}")
     state_machine.transition(store, a, "APPROVED", actor="human:tim", reason="strong scores")
     b = store.get_opportunity(opp_b.id)
-    print(f"B scores: pain={b.scores['pain'].value}")
+    print(f"B pain={b.scores['pain'].value}")
     state_machine.transition(store, b, "REJECTED_LOW_ROI", actor="human:tim",
                              reason="weak scores, saturated niche")
-    print(f"A -> {a.status}, B -> {b.status}")
 
-    banner("A continues past approval")
+    banner("A: validation -> build -> release bar (halts at READY)")
     print(f"A trace: {orch.run_pipeline(opp_a.id)}")
 
-    banner("C hits the budget ceiling")
+    banner("Human launches A — the opportunity->product seam")
+    a = store.get_opportunity(opp_a.id)
+    product = launch_product(store, a, venue.id, actor="human:tim")
+    print(f"A -> {a.status}; product {product.id} born with provenance {product.opportunity_id}")
+
+    banner("Reopen guard: a worker may not revive the dead, a human may")
+    b = store.get_opportunity(opp_b.id)
+    try:
+        state_machine.transition(store, b, "TRIAGED", actor="overeager_worker")
+    except state_machine.InvalidTransition as e:
+        print(f"BLOCKED as expected: {e}")
+    state_machine.transition(store, b, "TRIAGED", actor="human:tim",
+                             reason="market shifted, revisit")
+    print(f"B reopened -> {b.status} (full history retained)")
+
+    banner("C: hold/resume, then the budget ceiling")
+    c = store.get_opportunity(opp_c.id)
+    state_machine.transition(store, c, "ON_HOLD", actor="portfolio_manager", reason="capacity")
+    print(f"C held from {c.held_from} -> {c.status}")
+    state_machine.transition(store, c, "DISCOVERED", actor="portfolio_manager", reason="capacity freed")
+    print(f"C resumed -> {c.status}")
     try:
         orch.run_pipeline(opp_c.id)
     except budgets.BudgetExceeded as e:
         print(f"BLOCKED as expected: {e}")
     print(f"C status: {store.get_opportunity(opp_c.id).status} (work gated, state intact)")
 
-    banner("Budget report (derived from events, not stored)")
+    banner("Budget report (reserve/settle, derived from events)")
     print(f"allocated={research.allocated} "
           f"consumed={budgets.consumed(store, research.id):.2f} "
-          f"remaining={budgets.remaining(store, research.id):.2f}")
+          f"remaining={budgets.remaining(store, research.id):.2f} "
+          f"(settled actuals, not estimates)")
 
     banner("Worker runs (every decision has a cost)")
     for run in store.list_runs():
@@ -192,7 +230,7 @@ def main():
     for event_type, n in sorted(counts.items()):
         print(f"{event_type:<32} {n}")
 
-    print(f"\nSpike complete. Durable state in {DB} — inspect with sqlite3.")
+    print(f"\nSpike complete. Durable state in {DB} — inspect with sqlite3 or core.cli --db {DB}.")
 
 
 if __name__ == "__main__":

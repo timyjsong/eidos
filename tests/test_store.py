@@ -1,7 +1,15 @@
 import sqlite3
 import unittest
 
-from core.schemas import Budget, KnowledgeRecord, Opportunity, PermissionPolicy, WorkerRun
+from core.schemas import (
+    Budget,
+    Directive,
+    KnowledgeRecord,
+    Opportunity,
+    PermissionPolicy,
+    Venue,
+    WorkerRun,
+)
 from core.store import Store
 
 
@@ -20,8 +28,8 @@ class TestStore(unittest.TestCase):
 
     def test_list_opportunities_by_status(self):
         self.store.save_opportunity(Opportunity(title="a"))
-        self.store.save_opportunity(Opportunity(title="b", status="VETTED"))
-        self.assertEqual(len(self.store.list_opportunities(status="VETTED")), 1)
+        self.store.save_opportunity(Opportunity(title="b", status="TRIAGED"))
+        self.assertEqual(len(self.store.list_opportunities(status="TRIAGED")), 1)
 
     def test_other_registries_round_trip(self):
         know = KnowledgeRecord(type="t", source="s", content="c")
@@ -40,6 +48,16 @@ class TestStore(unittest.TestCase):
         self.store.save_run(run)
         self.assertEqual(self.store.get_run(run.id).opportunity_id, "opp_x")
         self.assertEqual(len(self.store.list_runs(opportunity_id="opp_x")), 1)
+
+        venue = Venue(name="Shopify App Store", kind="marketplace")
+        self.store.save_venue(venue)
+        self.assertEqual(self.store.get_venue(venue.id).name, "Shopify App Store")
+        self.assertEqual(len(self.store.list_venues()), 1)
+
+        directive = Directive(prompt="explore X", venues=[venue.id])
+        self.store.save_directive(directive)
+        self.assertEqual(self.store.get_directive(directive.id).venues, [venue.id])
+        self.assertEqual(len(self.store.list_directives()), 1)
 
     def test_events_ordered_and_filtered(self):
         self.store.emit("A", "actor", "target_1", {"n": 1})

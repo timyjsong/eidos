@@ -10,8 +10,9 @@ cost_estimate, and run(opportunity) -> WorkerResult.
 from dataclasses import dataclass, field
 
 from . import budget as budgets
+from . import event_types as ev
 from . import permissions, state_machine
-from .schemas import Score, WorkerRun, now_iso
+from .schemas import Product, Score, WorkerRun, now_iso
 
 
 @dataclass
@@ -26,10 +27,22 @@ def _merge_output(opp, output):
     """The platform owns state: worker outputs are merged here, never written by workers."""
     if "scores" in output:
         for dim, score in output["scores"].items():
-            opp.scores[dim] = score if isinstance(score, Score) else Score(**score)
-    for key in ("discovery", "decisions", "execution"):
+            opp.scores[dim] = score if isinstance(score, Score) else Score.model_validate(score)
+    for key in ("discovery", "validation", "decisions", "execution"):
         if key in output:
             getattr(opp, key).update(output[key])
+
+
+def launch_product(store, opp, venue_id, actor):
+    """The opportunity->product seam (ADR-0007): at launch a Product is born with
+    permanent provenance, and the opportunity's story ends."""
+    product = Product(name=opp.title, opportunity_id=opp.id,
+                      target_venue=venue_id, launch_date=now_iso())
+    store.save_product(product)
+    state_machine.transition(store, opp, "LAUNCHED", actor=actor, reason=f"as {product.id}")
+    store.emit(ev.PRODUCT_LAUNCHED, actor, product.id,
+               {"opportunity_id": opp.id, "venue_id": venue_id})
+    return product
 
 
 class Orchestrator:
@@ -57,11 +70,11 @@ class Orchestrator:
                         opportunity_id=opp.id, input_summary=f"status={opp.status}")
         self.store.save_run(run)
 
-        # Budget gates the work: blocked means the worker never runs.
+        # Budget gates the work: a refused reserve means the worker never runs.
         try:
-            budgets.spend(self.store, self.budget_id, worker.cost_estimate,
-                          actor=worker.worker_type,
-                          reason=f"{worker.worker_type} on {opp.id}", run_id=run.id)
+            budgets.reserve(self.store, self.budget_id, worker.cost_estimate,
+                            actor=worker.worker_type, run_id=run.id,
+                            reason=f"{worker.worker_type} on {opp.id}")
         except budgets.BudgetExceeded:
             run.status = "FAILED"
             run.finished_at = now_iso()
@@ -69,19 +82,35 @@ class Orchestrator:
             self.store.save_run(run)
             raise
 
-        result = worker.run(opp)
+        try:
+            result = worker.run(opp)
+        except Exception:
+            run.status = "FAILED"
+            run.finished_at = now_iso()
+            run.output = {"error": "worker raised"}
+            self.store.save_run(run)
+            budgets.settle(self.store, self.budget_id, run.id, 0.0,
+                           actor=worker.worker_type, reason="worker failed")
+            raise
 
-        run.status = "COMPLETED"
-        run.finished_at = now_iso()
-        run.output = result.output
-        run.cost_usd = result.cost_usd or worker.cost_estimate
-        run.tokens_in, run.tokens_out = result.tokens_in, result.tokens_out
-        self.store.save_run(run)
+        actual = result.cost_usd or worker.cost_estimate
+        budgets.settle(self.store, self.budget_id, run.id, actual, actor=worker.worker_type)
 
         for record in result.output.get("knowledge", []):
             self.store.save_knowledge(record)
-            self.store.emit("KNOWLEDGE_ADDED", worker.worker_type, record.id,
+            self.store.emit(ev.KNOWLEDGE_ADDED, worker.worker_type, record.id,
                             {"type": record.type, "source": record.source})
+
+        # Runs persist JSON-pure output: knowledge objects become their ids.
+        output_doc = dict(result.output)
+        if "knowledge" in output_doc:
+            output_doc["knowledge"] = [r.id for r in result.output["knowledge"]]
+        run.status = "COMPLETED"
+        run.finished_at = now_iso()
+        run.output = output_doc
+        run.cost_usd = actual
+        run.tokens_in, run.tokens_out = result.tokens_in, result.tokens_out
+        self.store.save_run(run)
 
         _merge_output(opp, result.output)
         self.store.save_opportunity(opp)
