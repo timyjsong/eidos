@@ -27,7 +27,7 @@ class TestSchemas(unittest.TestCase):
     def test_opportunity_defaults(self):
         opp = Opportunity(title="x")
         self.assertEqual(opp.status, "DISCOVERED")
-        self.assertEqual(opp.schema_version, 2)
+        self.assertEqual(opp.schema_version, 3)
         self.assertIsNone(opp.directive_id)
         self.assertIsNone(opp.held_from)
         self.assertEqual(set(opp.scores), set(SCORE_DIMENSIONS))
@@ -67,13 +67,16 @@ class TestSchemas(unittest.TestCase):
 
     def test_opportunity_json_round_trip(self):
         opp = Opportunity(title="x", directive_id="dir_1", signal_venues=["venue_1"])
-        opp.scores["pain"] = Score(value=7.0, confidence=0.8, evidence=["know_1"])
+        opp.scores["pain"] = Score(value=7.0, confidence=0.8,
+                                   estimate="weekly blocker for Pro-plan teams",
+                                   evidence=["know_1"])
         doc = json.loads(json.dumps(opp.to_doc()))
         back = Opportunity.from_doc(doc)
         self.assertEqual(back.id, opp.id)
         self.assertEqual(back.directive_id, "dir_1")
         self.assertIsInstance(back.scores["pain"], Score)
         self.assertEqual(back.scores["pain"].evidence, ["know_1"])
+        self.assertEqual(back.scores["pain"].estimate, "weekly blocker for Pro-plan teams")
 
     def test_venue_round_trip(self):
         venue = Venue(name="Shopify App Store", kind="marketplace",

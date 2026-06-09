@@ -40,7 +40,8 @@ class TestCli(unittest.TestCase):
                    store.conn.execute("SELECT id FROM knowledge")]][0]
 
         self._run("transition", opp.id, "TRIAGED", "--actor", "triage_agent")
-        self._run("score", "set", opp.id, "pain", "7.5", "0.8", "--evidence", know_id)
+        self._run("score", "set", opp.id, "pain", "7.5", "0.8",
+                  "--estimate", "weekly blocker", "--evidence", know_id)
         self._run("transition", opp.id, "EVALUATED", "--actor", "evaluator")
         self._run("approve", opp.id, "--reason", "strong scores")
 

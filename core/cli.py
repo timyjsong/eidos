@@ -125,14 +125,15 @@ def cmd_score_set(store, args):
     if opp is None:
         raise SystemExit(f"no such opportunity: {args.id}")
     score = Score(value=args.value, confidence=args.confidence,
-                  rationale=args.rationale,
+                  estimate=args.estimate, rationale=args.rationale,
                   evidence=args.evidence.split(",") if args.evidence else [])
     opp.scores[args.dimension] = score
     store.save_opportunity(opp)
     store.emit(ev.SCORE_SET, args.actor or _human(), opp.id,
                {"dimension": args.dimension, "value": args.value,
-                "confidence": args.confidence, "evidence": score.evidence})
-    print(f"{opp.id} {args.dimension} = {args.value} (confidence {args.confidence})")
+                "confidence": args.confidence, "estimate": args.estimate,
+                "evidence": score.evidence})
+    print(f"{opp.id} {args.dimension} = {args.value} ({args.estimate}; confidence {args.confidence})")
 
 
 def cmd_transition(store, args):
@@ -260,6 +261,8 @@ def build_parser():
     p.add_argument("dimension")
     p.add_argument("value", type=float)
     p.add_argument("confidence", type=float)
+    p.add_argument("--estimate", required=True,
+                   help="grounded quantity in native units, e.g. '~5 session-days, <$100'")
     p.add_argument("--rationale", default="")
     p.add_argument("--evidence", help="comma-separated knowledge ids")
     p.add_argument("--actor")

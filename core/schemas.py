@@ -45,6 +45,7 @@ def _check_confidence(confidence):
 class Score(DocModel):
     value: float | None = None
     confidence: float | None = None
+    estimate: str = ""  # grounded quantity in the dimension's native units — the real forecast
     rationale: str = ""
     evidence: list = Field(default_factory=list)  # Knowledge Record ids
 
@@ -61,7 +62,7 @@ def _empty_scores():
 class Opportunity(DocModel):
     title: str
     id: str = Field(default_factory=lambda: new_id("opp"))
-    schema_version: int = 2
+    schema_version: int = 3
     status: str = "DISCOVERED"
     directive_id: str | None = None
     signal_venues: list = Field(default_factory=list)
