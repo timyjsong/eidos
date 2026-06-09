@@ -81,7 +81,10 @@ class TestStateMachine(unittest.TestCase):
         self.assertEqual(self.store.get_opportunity(opp.id).status, "TRIAGED")
         changes = self.store.events_of_type("OPPORTUNITY_STATE_CHANGED", opp.id)
         self.assertEqual(len(changes), 1)
-        self.assertEqual(changes[0].payload, {"from": "DISCOVERED", "to": "TRIAGED", "reason": "r"})
+        payload = changes[0].payload
+        self.assertEqual((payload["from"], payload["to"], payload["reason"]),
+                         ("DISCOVERED", "TRIAGED", "r"))
+        self.assertIn("system_version", payload)  # decisions inherit system maturity
 
 
 if __name__ == "__main__":

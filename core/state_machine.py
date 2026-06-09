@@ -12,6 +12,7 @@ in new states — adding a worker must never require state-machine surgery.
 """
 from datetime import datetime, timezone
 
+from . import PLATFORM_VERSION
 from . import event_types as ev
 
 LIFECYCLE = [
@@ -97,6 +98,7 @@ def transition(store, opportunity, new_state, actor, reason=""):
         ev.OPPORTUNITY_STATE_CHANGED,
         actor,
         opportunity.id,
-        {"from": current, "to": new_state, "reason": reason},
+        {"from": current, "to": new_state, "reason": reason,
+         "system_version": PLATFORM_VERSION},
     )
     return opportunity
