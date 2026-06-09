@@ -81,12 +81,14 @@ def cmd_directive_list(store, args):
 
 
 def cmd_seed(store, args):
+    actor = args.actor or _human()
+    source = "human" if actor.startswith("human:") else "discovery"
     opp = Opportunity(title=args.title,
                       directive_id=args.directive,
                       signal_venues=args.signal_venues.split(",") if args.signal_venues else [])
     store.save_opportunity(opp)
-    store.emit(ev.OPPORTUNITY_CREATED, _human(), opp.id,
-               {"title": opp.title, "source": "human", "directive_id": args.directive})
+    store.emit(ev.OPPORTUNITY_CREATED, actor, opp.id,
+               {"title": opp.title, "source": source, "directive_id": args.directive})
     print(opp.id)
 
 
@@ -227,6 +229,7 @@ def build_parser():
     p.add_argument("--title", required=True)
     p.add_argument("--directive")
     p.add_argument("--signal-venues", dest="signal_venues")
+    p.add_argument("--actor")
     p.set_defaults(func=cmd_seed)
 
     opp = sub.add_parser("opp").add_subparsers(dest="sub", required=True)
