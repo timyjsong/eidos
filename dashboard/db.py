@@ -46,9 +46,15 @@ def venues(conn):
 
 
 def events(conn):
-    return _rows(
-        conn,
+    out = []
+    for row in conn.execute(
         "SELECT seq, id, type, timestamp, actor, target_id, payload"
-        " FROM events ORDER BY seq",
-        json_column="payload",
-    )
+        " FROM events ORDER BY seq"
+    ):
+        record = dict(row)
+        try:
+            record["payload"] = json.loads(record["payload"])
+        except (json.JSONDecodeError, TypeError):
+            pass  # malformed payload: keep the raw value, never an exception
+        out.append(record)
+    return out
