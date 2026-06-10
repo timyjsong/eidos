@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Audit — EIDOS Dashboard{% endblock %}
+{% block content %}
+<h1>Audit trail</h1>
+
+{% if events %}<table>
+<tr><th>Seq</th><th>Timestamp</th><th>Type</th><th>Actor</th><th>Target</th><th>Summary</th></tr>
+{% for e in events %}<tr><td>{{ e.seq }}</td><td>{{ e.timestamp }}</td><td>{{ e.type }}</td><td>{{ e.actor }}</td><td>{% if e.target_kind == "opp" %}<a href="opp/{{ e.target_id }}.html">{{ e.target_id }}</a>{% elif e.target_kind == "knowledge" %}<a href="knowledge.html#{{ e.target_id }}">{{ e.target_id }}</a>{% else %}{{ e.target_id }}{% endif %}</td><td>{{ e.summary }}</td></tr>
+{% endfor %}</table>
+{% else %}<p>No events recorded.</p>
+{% endif %}
+{% endblock %}
