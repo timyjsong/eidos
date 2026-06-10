@@ -43,15 +43,19 @@ def reserve(store, budget_id, amount, actor, run_id, reason=""):
     """Gate work against the budget. Refused reserve = the work does not happen."""
     if amount <= 0:
         raise ValueError("reserve amount must be positive")
-    if run_id in _ledger(store, budget_id):
-        raise ValueError(f"run {run_id} already has a reservation")
-    left = remaining(store, budget_id)
-    if amount > left:
-        store.emit(ev.BUDGET_BLOCKED, actor, budget_id,
-                   {"amount": amount, "remaining": left, "run_id": run_id, "reason": reason})
-        raise BudgetExceeded(f"{budget_id}: {amount} exceeds remaining {left}")
-    store.emit(ev.BUDGET_RESERVED, actor, budget_id,
-               {"amount": amount, "run_id": run_id, "reason": reason})
+    # BEGIN IMMEDIATE serializes concurrent reservers: the remaining-check and the
+    # emit happen under one write lock, so two processes can never both pass the
+    # check and overspend (TOCTOU). The fold is reads + one INSERT — no UPDATEs.
+    with store.immediate():
+        if run_id in _ledger(store, budget_id):
+            raise ValueError(f"run {run_id} already has a reservation")
+        left = remaining(store, budget_id)
+        if amount > left:
+            store.emit(ev.BUDGET_BLOCKED, actor, budget_id,
+                       {"amount": amount, "remaining": left, "run_id": run_id, "reason": reason})
+            raise BudgetExceeded(f"{budget_id}: {amount} exceeds remaining {left}")
+        store.emit(ev.BUDGET_RESERVED, actor, budget_id,
+                   {"amount": amount, "run_id": run_id, "reason": reason})
 
 
 def settle(store, budget_id, run_id, actual, actor, reason=""):

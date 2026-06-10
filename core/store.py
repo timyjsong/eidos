@@ -4,6 +4,7 @@ There are deliberately no delete methods anywhere. Archive, supersede — never 
 """
 import json
 import sqlite3
+from contextlib import contextmanager
 
 from .schemas import (
     Budget,
@@ -54,7 +55,30 @@ class Store:
     def __init__(self, path=":memory:"):
         self.conn = sqlite3.connect(path)
         self.conn.row_factory = sqlite3.Row
+        # WAL lets readers (the dashboard, mode=ro) proceed while a writer holds a
+        # transaction; busy_timeout makes concurrent writers wait instead of erroring.
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=5000")
         self.conn.executescript(_SCHEMA)
+
+    @contextmanager
+    def immediate(self):
+        """BEGIN IMMEDIATE: take the write lock up front so a check-then-emit
+        sequence is atomic against concurrent writers (other CLI processes).
+
+        emit()/save_* commit per statement as before, which ends the transaction;
+        the commit/rollback below only fire if the body left one open.
+        """
+        self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+        except BaseException:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            raise
+        else:
+            if self.conn.in_transaction:
+                self.conn.commit()
 
     # ---- events (append-only) ----
 
