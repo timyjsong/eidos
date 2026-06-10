@@ -75,6 +75,44 @@ class TestStateMachine(unittest.TestCase):
         sm.transition(self.store, opp, "TRIAGED", actor="portfolio_manager")
         self.assertEqual(opp.status, "TRIAGED")
 
+    def test_gate_targets_derived_from_tables(self):
+        self.assertEqual(sm.GATE_TARGETS, {"APPROVED", "LAUNCHED"} | set(sm.REJECTED))
+
+    def test_worker_blocked_at_approve_gate(self):
+        opp = self._opp(status="EVALUATED")
+        with self.assertRaises(sm.InvalidTransition):
+            sm.transition(self.store, opp, "APPROVED", actor="worker:rogue")
+        self.assertEqual(self.store.get_opportunity(opp.id).status, "EVALUATED")
+        blocked = self.store.events_of_type("OPPORTUNITY_TRANSITION_BLOCKED", opp.id)
+        self.assertEqual(len(blocked), 1)  # failed attempts are evidence too
+        self.assertEqual(blocked[0].payload["to"], "APPROVED")
+
+    def test_worker_blocked_at_reject_and_launch_gates(self):
+        opp = self._opp(status="EVALUATED")
+        with self.assertRaises(sm.InvalidTransition):
+            sm.transition(self.store, opp, "REJECTED_LOW_ROI", actor="evaluator")
+        self.assertEqual(self.store.get_opportunity(opp.id).status, "EVALUATED")
+        ready = self._opp(status="READY")
+        with self.assertRaises(sm.InvalidTransition):
+            sm.transition(self.store, ready, "LAUNCHED", actor="launch_worker")
+        self.assertEqual(self.store.get_opportunity(ready.id).status, "READY")
+
+    def test_human_and_operator_actors_pass_gates(self):
+        opp = self._opp(status="EVALUATED")
+        sm.transition(self.store, opp, "APPROVED", actor="operator:autonomous-gate")
+        self.assertEqual(self.store.get_opportunity(opp.id).status, "APPROVED")
+        other = self._opp(status="EVALUATED")
+        sm.transition(self.store, other, "REJECTED_LOW_ROI", actor="human:tim")
+        self.assertEqual(self.store.get_opportunity(other.id).status, "REJECTED_LOW_ROI")
+
+    def test_non_gate_transitions_stay_open_to_workers(self):
+        opp = self._opp()
+        sm.transition(self.store, opp, "TRIAGED", actor="worker:triage")  # forward
+        sm.transition(self.store, opp, "ON_HOLD", actor="worker:triage")  # hold
+        sm.transition(self.store, opp, "TRIAGED", actor="worker:triage")  # resume
+        sm.transition(self.store, opp, "ARCHIVED", actor="worker:triage")  # archive
+        self.assertEqual(self.store.get_opportunity(opp.id).status, "ARCHIVED")
+
     def test_transition_persists_and_emits(self):
         opp = self._opp()
         sm.transition(self.store, opp, "TRIAGED", actor="test", reason="r")

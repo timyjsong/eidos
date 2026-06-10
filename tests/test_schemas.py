@@ -86,5 +86,44 @@ class TestSchemas(unittest.TestCase):
         self.assertEqual(back.profile["distribution"], {"m": 1})
 
 
+class TestMigrations(unittest.TestCase):
+    def _opp_doc(self, version):
+        doc = json.loads(json.dumps(Opportunity(title="x").to_doc()))
+        doc["schema_version"] = version
+        return doc
+
+    def test_v2_opportunity_loads_and_resaves_at_current_version(self):
+        back = Opportunity.from_doc(self._opp_doc(2))
+        self.assertEqual(back.schema_version, 3)
+        self.assertEqual(back.to_doc()["schema_version"], 3)
+
+    def test_missing_migration_step_raises_clear_error(self):
+        with self.assertRaises(ValueError) as ctx:
+            Opportunity.from_doc(self._opp_doc(1))
+        msg = str(ctx.exception)
+        self.assertIn("Opportunity", msg)
+        self.assertIn("1 -> 2", msg)
+
+    def test_missing_migration_names_each_model(self):
+        doc = json.loads(json.dumps(
+            KnowledgeRecord(type="t", source="s", content="c").to_doc()))
+        doc["schema_version"] = 1
+        with self.assertRaises(ValueError) as ctx:
+            KnowledgeRecord.from_doc(doc)
+        self.assertIn("KnowledgeRecord", str(ctx.exception))
+
+    def test_current_version_doc_bypasses_migration_untouched(self):
+        doc = self._opp_doc(3)
+        snapshot = json.loads(json.dumps(doc))
+        back = Opportunity.from_doc(doc)
+        self.assertEqual(back.schema_version, 3)
+        self.assertEqual(doc, snapshot)
+
+    def test_migration_does_not_mutate_caller_doc(self):
+        doc = self._opp_doc(2)
+        Opportunity.from_doc(doc)
+        self.assertEqual(doc["schema_version"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()

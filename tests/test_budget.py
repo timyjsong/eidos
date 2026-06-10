@@ -1,3 +1,6 @@
+import os
+import tempfile
+import threading
 import unittest
 
 from core import budget as budgets
@@ -59,6 +62,50 @@ class TestBudget(unittest.TestCase):
             budgets.reserve(self.store, self.budget.id, 0, actor="w", run_id="run_1")
         with self.assertRaises(ValueError):
             budgets.settle(self.store, self.budget.id, "run_x", -1, actor="w")
+
+
+class TestReserveConcurrency(unittest.TestCase):
+    """AC2.3: two racing reserves against room for exactly one — never two RESERVED."""
+
+    def test_racing_reserves_one_reserved_one_blocked(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = os.path.join(tmp.name, "race.db")
+        setup = Store(path)
+        budget = budgets.create_budget(setup, "research", 1.0)
+        setup.conn.close()
+
+        barrier = threading.Barrier(2)  # synchronized start: both reserve at once
+        outcomes = []
+        outcomes_lock = threading.Lock()
+
+        def racer(run_id):
+            store = Store(path)  # own connection, like a separate CLI process
+            try:
+                barrier.wait()
+                try:
+                    # 0.8 against 1.0 allocated: room for exactly one of the two.
+                    budgets.reserve(store, budget.id, 0.8, actor="w", run_id=run_id)
+                    outcome = "reserved"
+                except budgets.BudgetExceeded:
+                    outcome = "blocked"
+                with outcomes_lock:
+                    outcomes.append(outcome)
+            finally:
+                store.conn.close()
+
+        threads = [threading.Thread(target=racer, args=(f"run_{i}",)) for i in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertCountEqual(outcomes, ["reserved", "blocked"])
+        check = Store(path)
+        self.addCleanup(check.conn.close)
+        self.assertEqual(len(check.events_of_type("BUDGET_RESERVED", budget.id)), 1)
+        self.assertEqual(len(check.events_of_type("BUDGET_BLOCKED", budget.id)), 1)
+        self.assertAlmostEqual(budgets.consumed(check, budget.id), 0.8)
 
 
 if __name__ == "__main__":

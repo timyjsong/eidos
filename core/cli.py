@@ -245,35 +245,40 @@ def cmd_transition(store, args):
     print(f"{opp.id} -> {opp.status}")
 
 
-def _human_transition(store, opp_id, state, reason):
+def _gate_actor(args):
+    """Honest stamping: `--operator` marks an autonomous gate, default is the human."""
+    return "operator:autonomous-gate" if args.operator else _human()
+
+
+def _human_transition(store, opp_id, state, reason, actor):
     store_opp = store.get_opportunity(opp_id)
     if store_opp is None:
         raise SystemExit(f"no such opportunity: {opp_id}")
-    state_machine.transition(store, store_opp, state, actor=_human(), reason=reason)
+    state_machine.transition(store, store_opp, state, actor=actor, reason=reason)
     print(f"{store_opp.id} -> {store_opp.status}")
 
 
 def cmd_approve(store, args):
-    _human_transition(store, args.id, "APPROVED", args.reason)
+    _human_transition(store, args.id, "APPROVED", args.reason, _gate_actor(args))
 
 
 def cmd_reject(store, args):
-    _human_transition(store, args.id, args.state, args.reason)
+    _human_transition(store, args.id, args.state, args.reason, _gate_actor(args))
 
 
 def cmd_hold(store, args):
-    _human_transition(store, args.id, "ON_HOLD", args.reason)
+    _human_transition(store, args.id, "ON_HOLD", args.reason, _gate_actor(args))
 
 
 def cmd_resume(store, args):
     opp = store.get_opportunity(args.id)
     if opp is None or opp.held_from is None:
         raise SystemExit(f"{args.id} is not on hold")
-    _human_transition(store, args.id, opp.held_from, args.reason)
+    _human_transition(store, args.id, opp.held_from, args.reason, _gate_actor(args))
 
 
 def cmd_reopen(store, args):
-    _human_transition(store, args.id, "TRIAGED", args.reason)
+    _human_transition(store, args.id, "TRIAGED", args.reason, _gate_actor(args))
 
 
 def cmd_launch(store, args):
@@ -301,6 +306,31 @@ def cmd_runs(store, args):
     for run in store.list_runs(opportunity_id=args.opp):
         print(f"{run.id}  {run.worker_type:<20} opp={run.opportunity_id} "
               f"{run.status:<10} ${run.cost_usd:.2f}")
+
+
+def cmd_lint_evidence(store, args):
+    """Read-only evidence lint: flag scores citing superseded or dangling knowledge.
+
+    Reporting only — emits no events, writes nothing; the re-score decision stays
+    with the operator/human. Exit 0 when clean, 1 when findings exist.
+    """
+    superseded, dangling = [], []
+    for opp in store.list_opportunities():
+        for dim, score in opp.scores.items():
+            for evidence_id in score.evidence:
+                record = store.get_knowledge(evidence_id)
+                if record is None:
+                    dangling.append((opp.id, dim, evidence_id))
+                elif record.superseded_by:
+                    superseded.append((opp.id, dim, evidence_id, record.superseded_by))
+    for opp_id, dim, evidence_id, by in superseded:
+        print(f"SUPERSEDED  {opp_id} {dim}: {evidence_id} superseded by {by}")
+    for opp_id, dim, evidence_id in dangling:
+        print(f"DANGLING    {opp_id} {dim}: {evidence_id} resolves to no knowledge record")
+    if superseded or dangling:
+        print(f"{len(superseded) + len(dangling)} finding(s)")
+        raise SystemExit(1)
+    print("evidence lint: clean")
 
 
 def build_parser():
@@ -424,6 +454,8 @@ def build_parser():
         for arg in extra:
             p.add_argument(arg)
         p.add_argument("--reason", default="")
+        p.add_argument("--operator", action="store_true",
+                       help="stamp actor operator:autonomous-gate instead of human:<user>")
         p.set_defaults(func=func)
 
     p = sub.add_parser("launch")
@@ -441,6 +473,9 @@ def build_parser():
     p = sub.add_parser("runs")
     p.add_argument("--opp")
     p.set_defaults(func=cmd_runs)
+
+    lint = sub.add_parser("lint").add_subparsers(dest="sub", required=True)
+    lint.add_parser("evidence").set_defaults(func=cmd_lint_evidence)
 
     return parser
 

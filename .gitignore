@@ -2,5 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 spike.db
+spike.db-*
 dashboard/out/
 platform.db
+platform.db-*
