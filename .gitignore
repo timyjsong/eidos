@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 spike.db
 dashboard/out/
+platform.db
