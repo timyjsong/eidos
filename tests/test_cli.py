@@ -64,6 +64,17 @@ class TestCli(unittest.TestCase):
         store = Store(self.db)
         self.assertEqual(store.get_opportunity(opp_id).status, "DISCOVERED")
 
+    def test_validate_records_check(self):
+        self._run("seed", "--title", "x")
+        store = Store(self.db)
+        opp_id = store.list_opportunities()[0].id
+        self._run("validate", opp_id, "problem", "pass", "--notes", "threads confirm volume")
+        store = Store(self.db)
+        opp = store.get_opportunity(opp_id)
+        self.assertEqual(opp.validation["problem"]["verdict"], "pass")
+        self.assertIsNone(opp.validation["market"])
+        self.assertEqual(len(store.events_of_type("VALIDATION_RESULT", opp_id)), 1)
+
     def test_venue_update_merges_profile(self):
         self._run("venue", "add", "--name", "V", "--profile", '{"distribution": {"a": 1}}')
         store = Store(self.db)

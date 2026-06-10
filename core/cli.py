@@ -13,7 +13,15 @@ from . import budget as budgets
 from . import event_types as ev
 from . import state_machine
 from .orchestrator import launch_product
-from .schemas import Directive, KnowledgeRecord, Opportunity, Score, Venue
+from .schemas import (
+    VALIDATION_CHECKS,
+    Directive,
+    KnowledgeRecord,
+    Opportunity,
+    Score,
+    Venue,
+    now_iso,
+)
 from .store import Store
 
 DEFAULT_DB = os.environ.get("PLATFORM_DB", "platform.db")
@@ -198,6 +206,27 @@ def cmd_score_set(store, args):
     print(f"{opp.id} {args.dimension} = {args.value} ({args.estimate}; confidence {args.confidence})")
 
 
+def cmd_validate(store, args):
+    """Record a validation check verdict with evidence — same discipline as scores."""
+    opp = store.get_opportunity(args.id)
+    if opp is None:
+        raise SystemExit(f"no such opportunity: {args.id}")
+    if args.check not in VALIDATION_CHECKS:
+        raise SystemExit(f"check must be one of {VALIDATION_CHECKS}")
+    evidence = args.evidence.split(",") if args.evidence else []
+    opp.validation[args.check] = {
+        "verdict": args.verdict,
+        "evidence": evidence,
+        "notes": args.notes,
+        "at": now_iso(),
+    }
+    store.save_opportunity(opp)
+    store.emit(ev.VALIDATION_RESULT, args.actor or _human(), opp.id,
+               {"check": args.check, "verdict": args.verdict,
+                "evidence": evidence, "notes": args.notes})
+    print(f"{opp.id} validation[{args.check}] = {args.verdict}")
+
+
 def cmd_recommend(store, args):
     """Record a gate recommendation as an event — counsel must not live only in chat."""
     opp = store.get_opportunity(args.id)
@@ -359,6 +388,15 @@ def build_parser():
     p.add_argument("--evidence", help="comma-separated knowledge ids")
     p.add_argument("--actor")
     p.set_defaults(func=cmd_score_set)
+
+    p = sub.add_parser("validate")
+    p.add_argument("id")
+    p.add_argument("check", help="problem | market | distribution")
+    p.add_argument("verdict", choices=["pass", "fail", "inconclusive"])
+    p.add_argument("--evidence", help="comma-separated knowledge ids")
+    p.add_argument("--notes", default="")
+    p.add_argument("--actor")
+    p.set_defaults(func=cmd_validate)
 
     p = sub.add_parser("recommend")
     p.add_argument("id")
