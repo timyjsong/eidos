@@ -64,6 +64,16 @@ class TestCli(unittest.TestCase):
         store = Store(self.db)
         self.assertEqual(store.get_opportunity(opp_id).status, "DISCOVERED")
 
+    def test_venue_update_merges_profile(self):
+        self._run("venue", "add", "--name", "V", "--profile", '{"distribution": {"a": 1}}')
+        store = Store(self.db)
+        venue_id = store.list_venues()[0].id
+        self._run("venue", "update", venue_id, "--profile", '{"change_feeds": ["url1"]}')
+        store = Store(self.db)
+        profile = store.get_venue(venue_id).profile
+        self.assertEqual(profile["change_feeds"], ["url1"])
+        self.assertEqual(profile["distribution"], {"a": 1})  # existing keys survive
+
     def test_recommend_records_event(self):
         self._run("seed", "--title", "x")
         store = Store(self.db)

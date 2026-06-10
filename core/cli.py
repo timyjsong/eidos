@@ -60,6 +60,19 @@ def cmd_venue_list(store, args):
         print(f"{venue.id}  {venue.name} ({venue.kind})")
 
 
+def cmd_venue_update(store, args):
+    """Merge new keys into a venue profile (top-level keys overwrite)."""
+    venue = store.get_venue(args.id)
+    if venue is None:
+        raise SystemExit(f"no such venue: {args.id}")
+    merge = json.loads(args.profile)
+    venue.profile.update(merge)
+    store.save_venue(venue)
+    store.emit(ev.VENUE_UPDATED, args.actor or _human(), venue.id,
+               {"merged_keys": list(merge.keys())})
+    print(f"{venue.id} profile updated: {', '.join(merge.keys())}")
+
+
 def cmd_directive_add(store, args):
     budget_id = None
     if args.budget is not None:
@@ -275,6 +288,11 @@ def build_parser():
     p.add_argument("--profile", help="JSON venue profile")
     p.set_defaults(func=cmd_venue_add)
     venue.add_parser("list").set_defaults(func=cmd_venue_list)
+    p = venue.add_parser("update")
+    p.add_argument("id")
+    p.add_argument("--profile", required=True, help="JSON merged into profile (top-level overwrite)")
+    p.add_argument("--actor")
+    p.set_defaults(func=cmd_venue_update)
 
     directive = sub.add_parser("directive").add_subparsers(dest="sub", required=True)
     p = directive.add_parser("add")
