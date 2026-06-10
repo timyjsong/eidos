@@ -8,6 +8,7 @@ in new states — adding a worker must never require state-machine surgery.
 - Archive: allowed from any active state.
 - ON_HOLD: from any active state except LAUNCHED; exits back to the state it left.
 - REOPEN: REJECTED_* -> TRIAGED, human/portfolio actors only. ARCHIVED is frozen.
+- Gates: APPROVED, LAUNCHED, and REJECTED_* require a human:/operator: actor.
 - Every blocked attempt is an event — failed attempts are evidence too.
 """
 from datetime import datetime, timezone
@@ -41,6 +42,9 @@ ALL_OPPORTUNITY_STATES = LIFECYCLE + ["ON_HOLD"] + OPPORTUNITY_TERMINAL
 _REJECTION_WINDOW = LIFECYCLE[LIFECYCLE.index("TRIAGED") : LIFECYCLE.index("VALIDATED") + 1]
 _REOPEN_ACTORS = ("portfolio_manager",)
 
+# Decision gates: only human:/operator: actors may move an opportunity into these.
+GATE_TARGETS = {"APPROVED", "LAUNCHED"} | set(REJECTED)
+
 TRANSITIONS = {}
 for _i, _state in enumerate(LIFECYCLE):
     _allowed = {"ARCHIVED"}
@@ -70,6 +74,10 @@ def _may_reopen(actor):
     return actor.startswith("human:") or actor in _REOPEN_ACTORS
 
 
+def _may_gate(actor):
+    return actor.startswith("human:") or actor.startswith("operator:")
+
+
 def transition(store, opportunity, new_state, actor, reason=""):
     """Move an opportunity to new_state or raise. Either way, leave an event."""
     current = opportunity.status
@@ -78,6 +86,8 @@ def transition(store, opportunity, new_state, actor, reason=""):
         blocked_why = "not an allowed transition"
     elif current in REJECTED and not _may_reopen(actor):
         blocked_why = "reopen requires a human or the portfolio manager"
+    elif new_state in GATE_TARGETS and not _may_gate(actor):
+        blocked_why = "gate targets require a human or operator actor"
     if blocked_why:
         store.emit(
             ev.OPPORTUNITY_TRANSITION_BLOCKED,

@@ -107,6 +107,30 @@ class TestCli(unittest.TestCase):
         self.assertEqual(store.get_knowledge(old_id).superseded_by, new_id)
         self.assertEqual(len(store.events_of_type("KNOWLEDGE_SUPERSEDED", old_id)), 1)
 
+    def test_approve_operator_flag_stamps_operator_actor(self):
+        self._run("seed", "--title", "x")
+        store = Store(self.db)
+        opp_id = store.list_opportunities()[0].id
+        self._run("transition", opp_id, "TRIAGED", "--actor", "triage_agent")
+        self._run("transition", opp_id, "EVALUATED", "--actor", "evaluator")
+        self._run("approve", opp_id, "--operator", "--reason", "recorded recommendation")
+        store = Store(self.db)
+        self.assertEqual(store.get_opportunity(opp_id).status, "APPROVED")
+        changes = store.events_of_type("OPPORTUNITY_STATE_CHANGED", opp_id)
+        approvals = [e for e in changes if e.payload["to"] == "APPROVED"]
+        self.assertEqual(len(approvals), 1)
+        self.assertEqual(approvals[0].actor, "operator:autonomous-gate")
+
+    def test_hold_without_operator_flag_stamps_human(self):
+        self._run("seed", "--title", "x")
+        store = Store(self.db)
+        opp_id = store.list_opportunities()[0].id
+        self._run("hold", opp_id)
+        store = Store(self.db)
+        changes = store.events_of_type("OPPORTUNITY_STATE_CHANGED", opp_id)
+        self.assertEqual(len(changes), 1)
+        self.assertTrue(changes[0].actor.startswith("human:"))
+
     def test_launch_creates_product(self):
         self._run("venue", "add", "--name", "v")
         self._run("seed", "--title", "launchable")

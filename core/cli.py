@@ -245,35 +245,40 @@ def cmd_transition(store, args):
     print(f"{opp.id} -> {opp.status}")
 
 
-def _human_transition(store, opp_id, state, reason):
+def _gate_actor(args):
+    """Honest stamping: `--operator` marks an autonomous gate, default is the human."""
+    return "operator:autonomous-gate" if args.operator else _human()
+
+
+def _human_transition(store, opp_id, state, reason, actor):
     store_opp = store.get_opportunity(opp_id)
     if store_opp is None:
         raise SystemExit(f"no such opportunity: {opp_id}")
-    state_machine.transition(store, store_opp, state, actor=_human(), reason=reason)
+    state_machine.transition(store, store_opp, state, actor=actor, reason=reason)
     print(f"{store_opp.id} -> {store_opp.status}")
 
 
 def cmd_approve(store, args):
-    _human_transition(store, args.id, "APPROVED", args.reason)
+    _human_transition(store, args.id, "APPROVED", args.reason, _gate_actor(args))
 
 
 def cmd_reject(store, args):
-    _human_transition(store, args.id, args.state, args.reason)
+    _human_transition(store, args.id, args.state, args.reason, _gate_actor(args))
 
 
 def cmd_hold(store, args):
-    _human_transition(store, args.id, "ON_HOLD", args.reason)
+    _human_transition(store, args.id, "ON_HOLD", args.reason, _gate_actor(args))
 
 
 def cmd_resume(store, args):
     opp = store.get_opportunity(args.id)
     if opp is None or opp.held_from is None:
         raise SystemExit(f"{args.id} is not on hold")
-    _human_transition(store, args.id, opp.held_from, args.reason)
+    _human_transition(store, args.id, opp.held_from, args.reason, _gate_actor(args))
 
 
 def cmd_reopen(store, args):
-    _human_transition(store, args.id, "TRIAGED", args.reason)
+    _human_transition(store, args.id, "TRIAGED", args.reason, _gate_actor(args))
 
 
 def cmd_launch(store, args):
@@ -424,6 +429,8 @@ def build_parser():
         for arg in extra:
             p.add_argument(arg)
         p.add_argument("--reason", default="")
+        p.add_argument("--operator", action="store_true",
+                       help="stamp actor operator:autonomous-gate instead of human:<user>")
         p.set_defaults(func=func)
 
     p = sub.add_parser("launch")
