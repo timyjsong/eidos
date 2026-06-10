@@ -308,6 +308,31 @@ def cmd_runs(store, args):
               f"{run.status:<10} ${run.cost_usd:.2f}")
 
 
+def cmd_lint_evidence(store, args):
+    """Read-only evidence lint: flag scores citing superseded or dangling knowledge.
+
+    Reporting only — emits no events, writes nothing; the re-score decision stays
+    with the operator/human. Exit 0 when clean, 1 when findings exist.
+    """
+    superseded, dangling = [], []
+    for opp in store.list_opportunities():
+        for dim, score in opp.scores.items():
+            for evidence_id in score.evidence:
+                record = store.get_knowledge(evidence_id)
+                if record is None:
+                    dangling.append((opp.id, dim, evidence_id))
+                elif record.superseded_by:
+                    superseded.append((opp.id, dim, evidence_id, record.superseded_by))
+    for opp_id, dim, evidence_id, by in superseded:
+        print(f"SUPERSEDED  {opp_id} {dim}: {evidence_id} superseded by {by}")
+    for opp_id, dim, evidence_id in dangling:
+        print(f"DANGLING    {opp_id} {dim}: {evidence_id} resolves to no knowledge record")
+    if superseded or dangling:
+        print(f"{len(superseded) + len(dangling)} finding(s)")
+        raise SystemExit(1)
+    print("evidence lint: clean")
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="platform", description=__doc__)
     parser.add_argument("--db", default=DEFAULT_DB)
@@ -448,6 +473,9 @@ def build_parser():
     p = sub.add_parser("runs")
     p.add_argument("--opp")
     p.set_defaults(func=cmd_runs)
+
+    lint = sub.add_parser("lint").add_subparsers(dest="sub", required=True)
+    lint.add_parser("evidence").set_defaults(func=cmd_lint_evidence)
 
     return parser
 

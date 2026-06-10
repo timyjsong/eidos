@@ -1,3 +1,5 @@
+import contextlib
+import io
 import os
 import tempfile
 import unittest
@@ -130,6 +132,60 @@ class TestCli(unittest.TestCase):
         changes = store.events_of_type("OPPORTUNITY_STATE_CHANGED", opp_id)
         self.assertEqual(len(changes), 1)
         self.assertTrue(changes[0].actor.startswith("human:"))
+
+    def test_lint_evidence_flags_superseded(self):
+        self._run("seed", "--title", "x")
+        self._run("know", "add", "--type", "pricing", "--source", "old", "--content", "stale")
+        self._run("know", "add", "--type", "pricing", "--source", "new", "--content", "fresh")
+        store = Store(self.db)
+        opp_id = store.list_opportunities()[0].id
+        by_source = {store.get_knowledge(r["id"]).source: r["id"]
+                     for r in store.conn.execute("SELECT id FROM knowledge")}
+        old_id, new_id = by_source["old"], by_source["new"]
+        self._run("score", "set", opp_id, "pain", "7", "0.8",
+                  "--estimate", "e", "--evidence", old_id)
+        self._run("know", "supersede", old_id, new_id)
+
+        store = Store(self.db)
+        events_before = len(store.all_events())
+        out = io.StringIO()
+        with self.assertRaises(SystemExit) as ctx, contextlib.redirect_stdout(out):
+            self._run("lint", "evidence")
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertIn(f"SUPERSEDED  {opp_id} pain: {old_id} superseded by {new_id}",
+                      out.getvalue())
+        store = Store(self.db)
+        self.assertEqual(len(store.all_events()), events_before)  # read-only: no event
+
+    def test_lint_evidence_flags_dangling(self):
+        self._run("seed", "--title", "x")
+        store = Store(self.db)
+        opp_id = store.list_opportunities()[0].id
+        self._run("score", "set", opp_id, "cost", "3", "0.5",
+                  "--estimate", "e", "--evidence", "know_nonexistent")
+        out = io.StringIO()
+        with self.assertRaises(SystemExit) as ctx, contextlib.redirect_stdout(out):
+            self._run("lint", "evidence")
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertIn(f"DANGLING    {opp_id} cost: know_nonexistent resolves to "
+                      "no knowledge record", out.getvalue())
+
+    def test_lint_evidence_clean_exits_zero_and_emits_nothing(self):
+        self._run("seed", "--title", "x")
+        self._run("know", "add", "--type", "t", "--source", "s", "--content", "c")
+        store = Store(self.db)
+        opp_id = store.list_opportunities()[0].id
+        know_id = store.conn.execute("SELECT id FROM knowledge").fetchone()["id"]
+        self._run("score", "set", opp_id, "pain", "7", "0.8",
+                  "--estimate", "e", "--evidence", know_id)
+        store = Store(self.db)
+        events_before = len(store.all_events())
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self._run("lint", "evidence")  # returns normally -> exit code 0
+        self.assertIn("evidence lint: clean", out.getvalue())
+        store = Store(self.db)
+        self.assertEqual(len(store.all_events()), events_before)  # read-only: no event
 
     def test_launch_creates_product(self):
         self._run("venue", "add", "--name", "v")
