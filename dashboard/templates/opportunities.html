@@ -6,8 +6,8 @@
 <section id="{{ status }}">
 <h2>{{ status }} ({{ rows | length }})</h2>
 <table>
-<tr><th>Id</th><th>Title</th><th>Updated</th><th></th></tr>
-{% for o in rows %}<tr><td>{{ o.id }}</td><td>{{ o.title }}</td><td>{{ o.updated_at }}</td><td><a href="opp/{{ o.id }}.html">detail</a></td></tr>
+<tr><th>Id</th><th>Title</th><th>Updated</th><th>Scores</th><th></th></tr>
+{% for o in rows %}<tr><td>{{ o.id }}</td><td>{{ o.title }}</td><td>{{ o.updated_at }}</td><td>{{ o.scored }}</td><td><a href="opp/{{ o.id }}.html">detail</a></td></tr>
 {% endfor %}</table>
 </section>
 {% endfor %}

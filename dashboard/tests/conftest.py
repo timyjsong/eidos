@@ -48,6 +48,29 @@ OPPORTUNITIES = [
             "signal_venues": ["venue_1", "venue_ghost"],  # venue_ghost: unknown
             "target_venues": ["venue_1"],
             "created_at": "2026-06-01T12:00:00Z",
+            "scores": {
+                "pain": {
+                    "value": 7.0,
+                    "confidence": 0.7,
+                    "rationale": "recurring forum demand",
+                    "evidence": ["know_1", "know_2"],  # both resolve
+                },
+                "market": {
+                    "value": 6.0,
+                    "confidence": 0.6,
+                    "rationale": "paid tier proves WTP",
+                    "evidence": [],  # empty: opinion flag
+                },
+                "moat": {
+                    "value": 4.5,
+                    "confidence": 0.5,
+                    "rationale": "cites a missing record",
+                    "evidence": ["know_ghost"],  # unknown id: unresolved
+                },
+                # Missing value/confidence/evidence: dashes + opinion flag,
+                # never a crash.
+                "cost": {"rationale": "not yet estimated"},
+            },
         },
     ),
     ("opp_4", "TRIAGED", "2026-06-04T00:00:00Z", {"title": "Delta"}),

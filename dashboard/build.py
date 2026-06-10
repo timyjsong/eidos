@@ -71,11 +71,47 @@ def funnel_context(conn):
                 "id": o["id"],
                 "title": o["doc"].get("title", "—"),
                 "updated_at": o["updated_at"],
+                "scored": score_summary(o["doc"].get("scores")),
             }
             for o in opps
         ]
         groups.append((status, rows))
     return {"groups": groups}
+
+
+def score_summary(scores):
+    """Compact funnel summary: dimension count, or ``unscored``."""
+    return f"{len(scores)} dims scored" if scores else "unscored"
+
+
+def scorecard_rows(scores, known_knowledge_ids):
+    """Scorecard table rows from an opp doc's ``scores`` map. A score is
+    never a bare float: value and confidence render together as a pair.
+    Defensive: a missing value/confidence renders as a dash, never an
+    exception; an unknown evidence id is marked unresolved, never a crash."""
+    rows = []
+    for dimension, score in (scores or {}).items():
+        if not isinstance(score, dict):
+            score = {}
+        value = score.get("value")
+        confidence = score.get("confidence")
+        evidence = score.get("evidence") or []
+        rows.append(
+            {
+                "dimension": dimension,
+                "pair": (
+                    f"{'—' if value is None else value}"
+                    f" @ conf {'—' if confidence is None else confidence}"
+                ),
+                "rationale": score.get("rationale") or "—",
+                "evidence": [
+                    {"id": e, "resolved": e in known_knowledge_ids}
+                    for e in evidence
+                ],
+                "no_evidence": not evidence,
+            }
+        )
+    return rows
 
 
 def event_summary(event):
@@ -100,6 +136,7 @@ def detail_contexts(conn):
     """One render context per opportunity for the detail page."""
     venue_names = {v["id"]: v["name"] for v in db.venues(conn)}
     directives_by_id = {d["id"]: d for d in db.directives(conn)}
+    known_knowledge_ids = {k["id"] for k in db.knowledge(conn)}
     events_by_target = {}
     for e in db.events(conn):  # already ordered by seq (chronology)
         events_by_target.setdefault(e["target_id"], []).append(e)
@@ -147,6 +184,7 @@ def detail_contexts(conn):
                 "target_venues": [
                     venue_names.get(v, v) for v in doc.get("target_venues") or []
                 ],
+                "scores": scorecard_rows(doc.get("scores"), known_knowledge_ids),
                 "events": events,
             }
         )

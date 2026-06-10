@@ -15,7 +15,14 @@
 
 <section id="scorecard">
 <h2>Scorecard</h2>
-<!-- Scorecard placeholder: rendered by story 1-4. -->
+{% if scores %}
+<table>
+<tr><th>Dimension</th><th>Value @ confidence</th><th>Rationale</th><th>Evidence</th></tr>
+{% for s in scores %}<tr><td>{{ s.dimension }}</td><td>{{ s.pair }}</td><td>{{ s.rationale }}</td><td>{% if s.no_evidence %}<span class="opinion">no evidence — opinion</span>{% else %}{% for e in s.evidence %}{% if e.resolved %}<a href="{{ root }}knowledge.html#{{ e.id }}">{{ e.id }}</a>{% else %}{{ e.id }} (unresolved){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</td></tr>
+{% endfor %}</table>
+{% else %}
+<p>No scores recorded for this opportunity.</p>
+{% endif %}
 </section>
 
 <section id="events">
