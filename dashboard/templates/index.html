@@ -8,7 +8,7 @@
 <h2>Opportunities by status</h2>
 <table>
 <tr><th>Status</th><th>Count</th></tr>
-{% for status, count in status_counts %}<tr><td>{{ status }}</td><td>{{ count }}</td></tr>
+{% for status, count in status_counts %}<tr><td>{{ status }}</td><td><a href="opportunities.html#{{ status }}">{{ count }}</a></td></tr>
 {% endfor %}</table>
 
 <h2>Knowledge records by type</h2>

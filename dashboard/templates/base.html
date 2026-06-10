@@ -11,10 +11,16 @@ table { border-collapse: collapse; margin-bottom: 1.5rem; }
 th, td { border: 1px solid #ccc; padding: 0.3rem 0.7rem; text-align: left; }
 th { background: #f4f4f4; }
 .gate { font-size: 1.1rem; }
+.event { border-left: 3px solid #ccc; padding: 0.2rem 0.8rem; margin-bottom: 0.6rem; }
+.event .meta { color: #666; font-size: 0.85rem; margin: 0 0 0.2rem 0; }
+.event p { margin: 0.1rem 0; }
+.gate-rec { border: 3px solid #b00; background: #fff3f0; padding: 0.6rem 0.8rem; }
+.gate-rec .rec { font-size: 1.15rem; }
 </style>
 </head>
 <body>
-<nav>{% block nav %}<a href="index.html">Overview</a>{% endblock %}</nav>
+<nav>{% block nav %}<a href="{{ root | default('') }}index.html">Overview</a>
+<a href="{{ root | default('') }}opportunities.html">Opportunities</a>{% endblock %}</nav>
 <main>
 {% block content %}{% endblock %}
 </main>

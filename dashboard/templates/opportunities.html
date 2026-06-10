@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Opportunities — EIDOS Dashboard{% endblock %}
+{% block content %}
+<h1>Opportunities</h1>
+{% for status, rows in groups %}
+<section id="{{ status }}">
+<h2>{{ status }} ({{ rows | length }})</h2>
+<table>
+<tr><th>Id</th><th>Title</th><th>Updated</th><th></th></tr>
+{% for o in rows %}<tr><td>{{ o.id }}</td><td>{{ o.title }}</td><td>{{ o.updated_at }}</td><td><a href="opp/{{ o.id }}.html">detail</a></td></tr>
+{% endfor %}</table>
+</section>
+{% endfor %}
+{% if not groups %}<p>No opportunities yet.</p>{% endif %}
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ opp.id }} — EIDOS Dashboard{% endblock %}
+{% block content %}
+<h1>{{ opp.title }}</h1>
+
+<table>
+<tr><th>Id</th><td>{{ opp.id }}</td></tr>
+<tr><th>Status</th><td>{{ opp.status }}</td></tr>
+<tr><th>Created</th><td>{{ opp.created_at }}</td></tr>
+<tr><th>Updated</th><td>{{ opp.updated_at }}</td></tr>
+<tr><th>Directive</th><td>{% if directive %}{{ directive.id }} — {{ directive.prompt }}{% else %}—{% endif %}</td></tr>
+<tr><th>Signal venues</th><td>{{ signal_venues | join(", ") if signal_venues else "—" }}</td></tr>
+<tr><th>Target venues</th><td>{{ target_venues | join(", ") if target_venues else "—" }}</td></tr>
+</table>
+
+<section id="scorecard">
+<h2>Scorecard</h2>
+<!-- Scorecard placeholder: rendered by story 1-4. -->
+</section>
+
+<section id="events">
+<h2>Event history</h2>
+{% for e in events %}
+{% if e.is_gate_recommendation %}
+<div class="event gate-rec">
+<p class="meta">{{ e.timestamp }} · GATE_RECOMMENDATION · {{ e.actor }}</p>
+<p class="rec"><strong>Recommendation: {{ e.recommendation }}</strong></p>
+<p>{{ e.reason }}</p>
+</div>
+{% else %}
+<div class="event">
+<p class="meta">{{ e.timestamp }} · {{ e.type }} · {{ e.actor }}</p>
+<p>{{ e.summary }}</p>
+</div>
+{% endif %}
+{% endfor %}
+{% if not events %}<p>No events recorded for this opportunity.</p>{% endif %}
+</section>
+{% endblock %}

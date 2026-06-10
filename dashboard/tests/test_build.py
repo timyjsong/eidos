@@ -20,10 +20,10 @@ def test_index_carries_expected_counts(fixture_db, tmp_path):
     build.build(fixture_db, out_dir)
     html = (out_dir / "index.html").read_text(encoding="utf-8")
 
-    # Opportunity counts by status.
-    assert "<td>DISCOVERED</td><td>2</td>" in html
-    assert "<td>TRIAGED</td><td>1</td>" in html
-    assert "<td>EVALUATED</td><td>1</td>" in html
+    # Opportunity counts by status (counts link to the funnel sections, AC2.5).
+    assert '<td>DISCOVERED</td><td><a href="opportunities.html#DISCOVERED">2</a></td>' in html
+    assert '<td>TRIAGED</td><td><a href="opportunities.html#TRIAGED">1</a></td>' in html
+    assert '<td>EVALUATED</td><td><a href="opportunities.html#EVALUATED">1</a></td>' in html
     # Knowledge counts by type.
     assert "<td>signal</td><td>2</td>" in html
     assert "<td>analysis</td><td>1</td>" in html
@@ -41,8 +41,8 @@ def test_unknown_statuses_appended_alphabetically(fixture_db, tmp_path):
     html = (out_dir / "index.html").read_text(encoding="utf-8")
 
     canonical_pos = html.index("<td>EVALUATED</td>")
-    aa_pos = html.index("<td>AA_FUTURE</td><td>1</td>")
-    zz_pos = html.index("<td>ZZ_FUTURE</td><td>1</td>")
+    aa_pos = html.index("<td>AA_FUTURE</td>")
+    zz_pos = html.index("<td>ZZ_FUTURE</td>")
     assert canonical_pos < aa_pos < zz_pos
 
 

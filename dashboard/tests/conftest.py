@@ -38,7 +38,18 @@ CREATE TABLE events (
 OPPORTUNITIES = [
     ("opp_1", "DISCOVERED", "2026-06-01T00:00:00Z", {"title": "Alpha"}),
     ("opp_2", "DISCOVERED", "2026-06-02T00:00:00Z", {"title": "Beta"}),
-    ("opp_3", "EVALUATED", "2026-06-03T00:00:00Z", {"title": "Gamma"}),
+    (
+        "opp_3",
+        "EVALUATED",
+        "2026-06-03T00:00:00Z",
+        {
+            "title": "Gamma",
+            "directive_id": "dir_1",
+            "signal_venues": ["venue_1", "venue_ghost"],  # venue_ghost: unknown
+            "target_venues": ["venue_1"],
+            "created_at": "2026-06-01T12:00:00Z",
+        },
+    ),
     ("opp_4", "TRIAGED", "2026-06-04T00:00:00Z", {"title": "Delta"}),
     # Statuses outside the canonical list: must not crash the build and must
     # be appended alphabetically after the canonical ones.
@@ -77,6 +88,17 @@ DIRECTIVES = [
 EVENTS = [
     ("evt_1", "OPP_DISCOVERED", "2026-06-01T00:00:00Z", "scout", "opp_1",
      {"note": "seeded"}),
+    ("evt_2", "OPPORTUNITY_STATE_CHANGED", "2026-06-02T00:00:00Z",
+     "worker:scout", "opp_3", {"from": "DISCOVERED", "to": "TRIAGED",
+                               "reason": "vetted"}),
+    ("evt_3", "OPPORTUNITY_STATE_CHANGED", "2026-06-03T00:00:00Z",
+     "worker:scout", "opp_3", {"from": "TRIAGED", "to": "EVALUATED"}),
+    ("evt_4", "GATE_RECOMMENDATION", "2026-06-04T00:00:00Z",
+     "worker:mimir", "opp_3", {"recommendation": "approve",
+                               "reason": "strong demand evidence"}),
+    # Defensive-parsing case: payload missing the "from" key.
+    ("evt_5", "OPPORTUNITY_STATE_CHANGED", "2026-06-05T00:00:00Z",
+     "worker:scout", "opp_4", {"to": "TRIAGED"}),
 ]
 
 
