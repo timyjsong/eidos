@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Overview — EIDOS Dashboard{% endblock %}
+{% block content %}
+<h1>Overview</h1>
+
+<p class="gate">Awaiting the human gate (EVALUATED): <strong>{{ evaluated_count }}</strong></p>
+
+<h2>Opportunities by status</h2>
+<table>
+<tr><th>Status</th><th>Count</th></tr>
+{% for status, count in status_counts %}<tr><td>{{ status }}</td><td>{{ count }}</td></tr>
+{% endfor %}</table>
+
+<h2>Knowledge records by type</h2>
+<table>
+<tr><th>Type</th><th>Count</th></tr>
+{% for type, count in knowledge_counts %}<tr><td>{{ type }}</td><td>{{ count }}</td></tr>
+{% endfor %}</table>
+
+<h2>Directives</h2>
+<table>
+<tr><th>Id</th><th>Prompt</th><th>Status</th><th>Budget allocated</th></tr>
+{% for d in directives %}<tr><td>{{ d.id }}</td><td>{{ d.prompt }}</td><td>{{ d.status }}</td><td>{{ d.allocated if d.allocated is not none else "—" }}</td></tr>
+{% endfor %}</table>
+{% endblock %}
