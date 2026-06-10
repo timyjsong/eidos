@@ -185,6 +185,16 @@ def cmd_score_set(store, args):
     print(f"{opp.id} {args.dimension} = {args.value} ({args.estimate}; confidence {args.confidence})")
 
 
+def cmd_recommend(store, args):
+    """Record a gate recommendation as an event — counsel must not live only in chat."""
+    opp = store.get_opportunity(args.id)
+    if opp is None:
+        raise SystemExit(f"no such opportunity: {args.id}")
+    store.emit(ev.GATE_RECOMMENDATION, args.actor or _human(), opp.id,
+               {"recommendation": args.verdict, "reason": args.reason})
+    print(f"recommendation recorded: {opp.id} -> {args.verdict}")
+
+
 def cmd_transition(store, args):
     opp = store.get_opportunity(args.id)
     if opp is None:
@@ -331,6 +341,13 @@ def build_parser():
     p.add_argument("--evidence", help="comma-separated knowledge ids")
     p.add_argument("--actor")
     p.set_defaults(func=cmd_score_set)
+
+    p = sub.add_parser("recommend")
+    p.add_argument("id")
+    p.add_argument("verdict", help="e.g. approve, reject, hold")
+    p.add_argument("--reason", default="")
+    p.add_argument("--actor")
+    p.set_defaults(func=cmd_recommend)
 
     p = sub.add_parser("transition")
     p.add_argument("id")

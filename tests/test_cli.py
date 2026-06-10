@@ -64,6 +64,16 @@ class TestCli(unittest.TestCase):
         store = Store(self.db)
         self.assertEqual(store.get_opportunity(opp_id).status, "DISCOVERED")
 
+    def test_recommend_records_event(self):
+        self._run("seed", "--title", "x")
+        store = Store(self.db)
+        opp_id = store.list_opportunities()[0].id
+        self._run("recommend", opp_id, "approve", "--reason", "strong wedge")
+        store = Store(self.db)
+        recs = store.events_of_type("GATE_RECOMMENDATION", opp_id)
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0].payload["recommendation"], "approve")
+
     def test_know_supersede(self):
         self._run("know", "add", "--type", "pricing", "--source", "old", "--content", "stale fact")
         self._run("know", "add", "--type", "pricing", "--source", "new", "--content", "fresh fact")
