@@ -97,9 +97,12 @@ def cmd_seed(store, args):
     opp = Opportunity(title=args.title,
                       directive_id=args.directive,
                       signal_venues=args.signal_venues.split(",") if args.signal_venues else [])
+    if args.method:
+        opp.discovery["method"] = args.method
     store.save_opportunity(opp)
     store.emit(ev.OPPORTUNITY_CREATED, actor, opp.id,
-               {"title": opp.title, "source": source, "directive_id": args.directive})
+               {"title": opp.title, "source": source, "directive_id": args.directive,
+                "method": args.method})
     print(opp.id)
 
 
@@ -265,6 +268,7 @@ def build_parser():
     p.add_argument("--title", required=True)
     p.add_argument("--directive")
     p.add_argument("--signal-venues", dest="signal_venues")
+    p.add_argument("--method", help="discovery method key (discovery-methods.md)")
     p.add_argument("--actor")
     p.set_defaults(func=cmd_seed)
 
