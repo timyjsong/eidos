@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import tempfile
@@ -27,6 +28,27 @@ class TestStore(unittest.TestCase):
         self.store.save_opportunity(opp)
         self.assertEqual(self.store.get_opportunity(opp.id).title, "t2")
         self.assertEqual(len(self.store.list_opportunities()), 1)
+
+    def test_v2_opportunity_row_upgrades_on_load_and_save(self):
+        opp = Opportunity(title="legacy")
+        doc = opp.to_doc()
+        doc["schema_version"] = 2
+        self.store.conn.execute(
+            "INSERT INTO opportunities (id, status, updated_at, doc) VALUES (?, ?, ?, ?)",
+            [opp.id, opp.status, opp.updated_at, json.dumps(doc)])
+        self.store.conn.commit()
+
+        loaded = self.store.get_opportunity(opp.id)
+        self.assertEqual(loaded.schema_version, 3)
+        # the row on disk stays v2 until the next save — no mass migration
+        row = self.store.conn.execute(
+            "SELECT doc FROM opportunities WHERE id = ?", [opp.id]).fetchone()
+        self.assertEqual(json.loads(row["doc"])["schema_version"], 2)
+
+        self.store.save_opportunity(loaded)
+        row = self.store.conn.execute(
+            "SELECT doc FROM opportunities WHERE id = ?", [opp.id]).fetchone()
+        self.assertEqual(json.loads(row["doc"])["schema_version"], 3)
 
     def test_list_opportunities_by_status(self):
         self.store.save_opportunity(Opportunity(title="a"))

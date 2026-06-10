@@ -4,6 +4,7 @@ The to_doc/from_doc seam is stable across schema backends (ADR-0001).
 """
 import uuid
 from datetime import datetime, timezone
+from typing import Callable, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -28,11 +29,32 @@ def new_id(prefix):
 class DocModel(BaseModel):
     """JSON-document round-trip (decisions/0002)."""
 
+    # Migration registry (foundations-audit-1 M4): _MIGRATIONS[n] upgrades a
+    # doc from schema_version n to n+1. A version bump without a registered
+    # step is a hard error in from_doc — never a silent coerce.
+    _MIGRATIONS: ClassVar[dict[int, Callable[[dict], dict]]] = {}
+
     def to_doc(self):
         return self.model_dump()
 
     @classmethod
     def from_doc(cls, doc):
+        field = cls.model_fields.get("schema_version")
+        current = field.default if field else None
+        version = doc.get("schema_version")
+        if current is not None and version is not None and version < current:
+            doc = dict(doc)
+            while version < current:
+                migrate = cls._MIGRATIONS.get(version)
+                if migrate is None:
+                    raise ValueError(
+                        f"{cls.__name__}: no migration registered for "
+                        f"schema_version {version} -> {version + 1} "
+                        f"(current is {current})"
+                    )
+                doc = migrate(doc)
+                version += 1
+                doc["schema_version"] = version
         return cls.model_validate(doc)
 
 
@@ -59,7 +81,14 @@ def _empty_scores():
     return {dim: Score() for dim in SCORE_DIMENSIONS}
 
 
+def _opportunity_v2_to_v3(doc):
+    """v2 -> v3: cosmetic bump, audit M4 — fields are identical, explicit no-op."""
+    return doc
+
+
 class Opportunity(DocModel):
+    _MIGRATIONS: ClassVar[dict[int, Callable[[dict], dict]]] = {2: _opportunity_v2_to_v3}
+
     title: str
     id: str = Field(default_factory=lambda: new_id("opp"))
     schema_version: int = 3
