@@ -118,6 +118,22 @@ def cmd_opp_show(store, args):
     print(json.dumps(opp.to_doc(), indent=2))
 
 
+def cmd_opp_scores(store, args):
+    """The canonical scorecard: a score never appears without its estimate."""
+    opp = store.get_opportunity(args.id)
+    if opp is None:
+        raise SystemExit(f"no such opportunity: {args.id}")
+    print(f"{opp.id}  [{opp.status}]  {opp.title}")
+    if opp.discovery.get("method"):
+        print(f"  discovered via: {opp.discovery['method']}")
+    for dim, s in opp.scores.items():
+        value = "-" if s.value is None else f"{s.value:g}"
+        conf = "-" if s.confidence is None else f"{s.confidence:g}"
+        print(f"  {dim:<13} {value:>4}  conf {conf:<4}  {s.estimate}")
+        if s.evidence:
+            print(f"  {'':13}             evidence: {','.join(s.evidence)}")
+
+
 def cmd_opp_history(store, args):
     for e in store.events_for(args.id):
         print(f"{e.timestamp}  {e.type:<32} actor={e.actor} {json.dumps(e.payload)}")
@@ -279,6 +295,9 @@ def build_parser():
     p = opp.add_parser("show")
     p.add_argument("id")
     p.set_defaults(func=cmd_opp_show)
+    p = opp.add_parser("scores")
+    p.add_argument("id")
+    p.set_defaults(func=cmd_opp_scores)
     p = opp.add_parser("history")
     p.add_argument("id")
     p.set_defaults(func=cmd_opp_history)
