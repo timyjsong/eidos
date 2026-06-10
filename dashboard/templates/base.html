@@ -28,7 +28,9 @@ th { background: #f4f4f4; }
 <body>
 <nav>{% block nav %}<a href="{{ root | default('') }}index.html">Overview</a>
 <a href="{{ root | default('') }}opportunities.html">Opportunities</a>
-<a href="{{ root | default('') }}knowledge.html">Knowledge</a>{% endblock %}</nav>
+<a href="{{ root | default('') }}knowledge.html">Knowledge</a>
+<a href="{{ root | default('') }}methods.html">Methods</a>
+<a href="{{ root | default('') }}events.html">Audit</a>{% endblock %}</nav>
 <main>
 {% block content %}{% endblock %}
 </main>

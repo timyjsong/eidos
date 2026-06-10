@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Methods — EIDOS Dashboard{% endblock %}
+{% block content %}
+<h1>Methods</h1>
+
+<h2>Per-directive outcomes</h2>
+{% for d in directives %}
+<section id="{{ d.id }}">
+<h3>{{ d.id }}</h3>
+<p class="meta">status: {{ d.status }} · budget allocated: {{ d.allocated if d.allocated is not none else "—" }}</p>
+<p>{{ d.prompt }}</p>
+{% if d.opps %}<table>
+<tr><th>Id</th><th>Title</th><th>Status</th></tr>
+{% for o in d.opps %}<tr><td>{{ o.id }}</td><td>{{ o.title }}</td><td><a href="opp/{{ o.id }}.html">{{ o.status }}</a></td></tr>
+{% endfor %}</table>
+{% else %}<p>No opportunities attributed to this directive.</p>
+{% endif %}</section>
+{% endfor %}
+{% if not directives %}<p>No directives yet.</p>{% endif %}
+
+<section id="unattributed">
+<h2>Manual / unattributed</h2>
+{% if unattributed %}<table>
+<tr><th>Id</th><th>Title</th><th>Status</th></tr>
+{% for o in unattributed %}<tr><td>{{ o.id }}</td><td>{{ o.title }}</td><td><a href="opp/{{ o.id }}.html">{{ o.status }}</a></td></tr>
+{% endfor %}</table>
+{% else %}<p>No unattributed opportunities.</p>
+{% endif %}</section>
+
+<section id="method-knowledge">
+<h2>Method knowledge</h2>
+{% for tag, records in method_groups %}
+<h3 id="{{ tag }}">{{ tag }} ({{ records | length }})</h3>
+<ul>
+{% for r in records %}<li><a href="knowledge.html#{{ r.id }}">{{ r.id }}</a> — {{ r.first_line }}</li>
+{% endfor %}</ul>
+{% endfor %}
+{% if not method_groups %}<p>No method-tagged knowledge.</p>{% endif %}
+</section>
+{% endblock %}
