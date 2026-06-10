@@ -14,7 +14,7 @@
 <h2>Knowledge records by type</h2>
 <table>
 <tr><th>Type</th><th>Count</th></tr>
-{% for type, count in knowledge_counts %}<tr><td>{{ type }}</td><td>{{ count }}</td></tr>
+{% for type, count in knowledge_counts %}<tr><td>{{ type }}</td><td><a href="knowledge.html#{{ type }}">{{ count }}</a></td></tr>
 {% endfor %}</table>
 
 <h2>Directives</h2>

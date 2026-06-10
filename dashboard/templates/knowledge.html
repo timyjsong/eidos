@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Knowledge — EIDOS Dashboard{% endblock %}
+{% block content %}
+<h1>Knowledge</h1>
+
+{% for type, records in groups %}
+<section id="{{ type }}">
+<h2>{{ type }} ({{ records | length }})</h2>
+{% for r in records %}
+<article id="{{ r.id }}" class="know{% if r.superseded_by %} superseded{% endif %}">
+<p class="meta">{{ r.id }} · {{ r.source }} · {{ r.observed_at }} · confidence: {{ r.confidence }} · venue: {{ r.venue }}</p>
+{% if r.superseded_by %}<p class="superseded-note">Superseded by {% if r.superseder_known %}<a href="#{{ r.superseded_by }}">{{ r.superseded_by }}</a>{% else %}{{ r.superseded_by }}{% endif %}</p>
+{% endif %}<p class="tags">Tags: {% if r.tags %}{% for t in r.tags %}<span class="tag">{{ t }}</span>{% if not loop.last %} {% endif %}{% endfor %}{% else %}—{% endif %}</p>
+{% if not r.content %}<p class="content">—</p>
+{% elif r.long %}<details><summary>{{ r.first_line }}</summary>
+<pre>{{ r.content }}</pre>
+</details>
+{% else %}<p class="content">{{ r.content }}</p>
+{% endif %}</article>
+{% endfor %}
+</section>
+{% endfor %}
+{% if not groups %}<p>No knowledge records yet.</p>{% endif %}
+
+<section id="tag-index">
+<h2>Tag index</h2>
+{% if tags %}<table>
+<tr><th>Tag</th><th>Records</th></tr>
+{% for tag, ids in tags %}<tr><td>{{ tag }}</td><td>{% for id in ids %}<a href="#{{ id }}">{{ id }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td></tr>
+{% endfor %}</table>
+{% else %}<p>No tags.</p>{% endif %}
+</section>
+{% endblock %}

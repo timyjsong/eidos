@@ -153,6 +153,53 @@ def detail_contexts(conn):
     return contexts
 
 
+# Content longer than this renders inside a collapsed <details> element.
+LONG_CONTENT_CHARS = 400
+
+
+def knowledge_context(conn):
+    """Render context for the knowledge browser: records grouped by type
+    (alphabetical), plus a tag index. Defensive: a missing doc key renders
+    as a dash, never an exception."""
+    venue_names = {v["id"]: v["name"] for v in db.venues(conn)}
+    records = db.knowledge(conn)
+    known_ids = {k["id"] for k in records}
+
+    by_type = {}
+    tag_index = {}
+    for k in sorted(records, key=lambda k: k["id"]):
+        doc = k["doc"]
+        content = doc.get("content") or ""
+        tags = doc.get("tags") or []
+        venue_id = doc.get("venue_id")
+        confidence = doc.get("confidence")
+        superseded_by = doc.get("superseded_by")
+        record = {
+            "id": k["id"],
+            "source": doc.get("source") or "—",
+            # observed_at can be missing OR an empty string in real docs.
+            "observed_at": doc.get("observed_at") or doc.get("created_at") or "—",
+            "confidence": "—" if confidence is None else confidence,
+            "tags": tags,
+            # Unknown venue ids fall back to the raw id — never a crash.
+            "venue": venue_names.get(venue_id, venue_id) if venue_id else "—",
+            "content": content,
+            "long": len(content) > LONG_CONTENT_CHARS,
+            "first_line": content.splitlines()[0] if content else "—",
+            "superseded_by": superseded_by,
+            # The superseding record is not required to exist (AC3.2).
+            "superseder_known": superseded_by in known_ids,
+        }
+        by_type.setdefault(k["type"], []).append(record)
+        for tag in tags:
+            tag_index.setdefault(tag, []).append(k["id"])
+
+    return {
+        "groups": [(t, by_type[t]) for t in sorted(by_type)],
+        "tags": [(t, tag_index[t]) for t in sorted(tag_index)],
+    }
+
+
 def overview_context(conn):
     opps = db.opportunities(conn)
     status_counts = Counter(o["status"] for o in opps)
@@ -191,12 +238,16 @@ def build(db_path, out_dir):
         funnel_html = env.get_template("opportunities.html").render(
             funnel_context(conn)
         )
+        knowledge_html = env.get_template("knowledge.html").render(
+            knowledge_context(conn)
+        )
         details = detail_contexts(conn)
     finally:
         conn.close()
 
     (out_dir / "index.html").write_text(index_html, encoding="utf-8")
     (out_dir / "opportunities.html").write_text(funnel_html, encoding="utf-8")
+    (out_dir / "knowledge.html").write_text(knowledge_html, encoding="utf-8")
 
     opp_dir = out_dir / "opp"
     opp_dir.mkdir(parents=True, exist_ok=True)

@@ -24,9 +24,9 @@ def test_index_carries_expected_counts(fixture_db, tmp_path):
     assert '<td>DISCOVERED</td><td><a href="opportunities.html#DISCOVERED">2</a></td>' in html
     assert '<td>TRIAGED</td><td><a href="opportunities.html#TRIAGED">1</a></td>' in html
     assert '<td>EVALUATED</td><td><a href="opportunities.html#EVALUATED">1</a></td>' in html
-    # Knowledge counts by type.
-    assert "<td>signal</td><td>2</td>" in html
-    assert "<td>analysis</td><td>1</td>" in html
+    # Knowledge counts by type (counts link to the type sections, AC3.5).
+    assert '<td>signal</td><td><a href="knowledge.html#signal">2</a></td>' in html
+    assert '<td>analysis</td><td><a href="knowledge.html#analysis">1</a></td>' in html
     # Directive with status and budget allocated.
     assert "dir_1" in html
     assert "<td>active</td>" in html
