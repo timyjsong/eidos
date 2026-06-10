@@ -80,6 +80,17 @@ def cmd_directive_list(store, args):
         print(f"{d.id}  [{d.status}] {d.prompt} venues={d.venues} budget={d.budget_id}")
 
 
+def cmd_directive_close(store, args):
+    directive = store.get_directive(args.id)
+    if directive is None:
+        raise SystemExit(f"no such directive: {args.id}")
+    directive.status = "CLOSED"
+    store.save_directive(directive)
+    store.emit(ev.DIRECTIVE_CLOSED, args.actor or _human(), directive.id,
+               {"reason": args.reason})
+    print(f"{directive.id} -> CLOSED")
+
+
 def cmd_seed(store, args):
     actor = args.actor or _human()
     source = "human" if actor.startswith("human:") else "discovery"
@@ -244,6 +255,11 @@ def build_parser():
     p.add_argument("--cadence", default="one_shot")
     p.set_defaults(func=cmd_directive_add)
     directive.add_parser("list").set_defaults(func=cmd_directive_list)
+    p = directive.add_parser("close")
+    p.add_argument("id")
+    p.add_argument("--reason", default="")
+    p.add_argument("--actor")
+    p.set_defaults(func=cmd_directive_close)
 
     p = sub.add_parser("seed")
     p.add_argument("--title", required=True)
