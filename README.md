@@ -17,13 +17,12 @@ score, and decision is an append-only event, so the whole history is reconstruct
 the log alone. An autonomous operator drives discover → evaluate → red-team → recommend,
 and never crosses a gate on its own.
 
-> **Where it stands, stated plainly.** The pipeline runs from discovery through a
-> build-ready decision. The build and launch stages exist in the lifecycle but have not
-> been exercised in a real run — no candidate has reached the build stage. That is the system
-> working as designed: it exists to decide *well and cheaply* before committing to a build,
-> so a conservative funnel is the feature and zero products launched is on purpose. This
-> repository is the engine and the methodology, with a deterministic demo and a full test
-> suite; the specific opportunities and research produced by operating it are kept private.
+> **Scope, stated plainly.** EIDOS is a decision/triage platform, not a product factory:
+> the deliverable is a vetted, *build-ready decision*. Its lifecycle runs all the way
+> through build and launch, but the hard, valuable work is upstream — turning nothing into
+> a decision worth acting on, cheaply, before real resources are committed. This repository
+> is the engine and the methodology, with a deterministic demo and a full test suite; the
+> opportunities and research produced by operating it are kept private.
 
 ---
 
