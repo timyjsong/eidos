@@ -1,4 +1,4 @@
-"""Spike: run fake opportunities through the governed v0.3 pipeline end to end.
+"""Demo: run fake opportunities through the governed v0.3 pipeline end to end.
 
 Demonstrates: venue + directive entry, decision-phase lifecycle, human gates,
 reserve/settle budgets, the launch seam (opportunity -> product), reopen guard,
@@ -6,7 +6,7 @@ hold/resume, and full history reconstruction from events.
 
 All workers are deterministic stubs and live outside core/ on purpose.
 
-Run: .venv/bin/python spike.py  (or python3 spike.py)
+Run: python demo.py
 """
 import os
 
@@ -16,7 +16,7 @@ from core.orchestrator import Orchestrator, WorkerResult, launch_product
 from core.schemas import Directive, KnowledgeRecord, Opportunity, Venue, now_iso
 from core.store import Store
 
-DB = "spike.db"
+DB = "demo.db"
 
 
 class StubWorker:
@@ -102,7 +102,7 @@ def banner(text):
 
 def main():
     if os.path.exists(DB):
-        os.remove(DB)  # spike sandbox only — platform data is never deleted
+        os.remove(DB)  # demo sandbox only — platform data is never deleted
     store = Store(DB)
 
     # Governance first.
@@ -230,7 +230,7 @@ def main():
     for event_type, n in sorted(counts.items()):
         print(f"{event_type:<32} {n}")
 
-    print(f"\nSpike complete. Durable state in {DB} — inspect with sqlite3 or core.cli --db {DB}.")
+    print(f"\nDemo complete. Durable state in {DB} — inspect with sqlite3 or core.cli --db {DB}.")
 
 
 if __name__ == "__main__":
