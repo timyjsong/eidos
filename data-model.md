@@ -491,29 +491,3 @@ Every external action should generate an event.
 Never rely on current state alone.
 
 History should always be reconstructable.
-
----
-
-# Early MVP Recommendation
-
-Build these first:
-
-1. Opportunity table
-2. Product table
-3. Event table
-4. Knowledge table
-5. Worker run table
-6. Simple state machine
-7. Simple orchestrator
-
-Do not build sophisticated workers until these exist.
-
----
-
-# Reminder
-
-This document is a draft.
-
-The goal is not perfect schemas.
-
-The goal is creating enough structure that rapid iteration does not become chaos.

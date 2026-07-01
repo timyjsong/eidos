@@ -2,36 +2,34 @@
 
 *Evidence-Integrated Decision & Opportunity System*
 
-**A governed decision engine built around a *creative* discovery loop — designed to invent and compound software opportunities, not just scrape the web for pain points.**
+**An end-to-end pipeline that takes a software product from zero — no idea yet — through discovery and evaluation to a build-ready decision. The moat is the discovery step: it *invents* opportunities through creative discovery rather than scraping for known painpoints.**
 
-Most "find a SaaS idea" approaches do the same thing: mine forums for complaints and wrap
-each one in an app. EIDOS is built on the opposite bet — that the opportunities worth
-building are the ones you *construct*. Its discovery loop is designed to compound weak
-signals across domains, surface latent demand nobody has named yet, and reason toward
-products for tolerated, un-automated routines — **creating** demand rather than harvesting
-the obvious. That loop is the point of the project. The rest — the state machine, the
-event log, the scoring, the gates — is the discipline that keeps a creative process honest
-instead of letting it wander.
+Most idea-sourcing is static painpoint detection: scrape forums for complaints, rank by
+volume, build the loudest one. That space is crowded and its winners are already taken.
+EIDOS does creative discovery instead — it compounds weak signals across domains, surfaces
+latent demand nobody has named yet, and reasons toward products for tolerated, un-automated
+routines. It **invents** opportunities rather than harvesting the obvious. That discovery
+loop is the moat; everything downstream is the discipline that keeps it honest.
 
-Around that core, EIDOS is a full, auditable lifecycle. A candidate enters a state
-machine, accumulates evidence-backed scores, passes adversarial review, and stops at human
-gates before any resources are committed. Every state change, score, and decision is an
-append-only event, so the whole history is reconstructable from the log alone. An
-autonomous operator drives discover → evaluate → red-team → recommend, and never crosses a
-gate on its own.
+A candidate enters a state machine, accumulates evidence-backed scores, passes adversarial
+review, and stops at human gates before any resources are committed. Every state change,
+score, and decision is an append-only event, so the whole history is reconstructable from
+the log alone. An autonomous operator drives discover → evaluate → red-team → recommend,
+and never crosses a gate on its own.
 
-> **Scope, stated plainly.** This repository is the *engine and the methodology* — with a
-> deterministic demo and a full test suite. It is a decision/triage platform, **not** a
-> product factory: zero products launched, by design. The point is to decide *well*,
-> cheaply, before building. The opportunities and research produced by operating it are
-> kept private; what's here is the machinery and the method.
+> **Where it stands, stated plainly.** The pipeline runs from discovery through a
+> build-ready decision. The build and launch stages exist in the lifecycle but have not
+> been exercised in a real run — no candidate has reached the build stage. That is the system
+> working as designed: it exists to decide *well and cheaply* before committing to a build,
+> so a conservative funnel is the feature and zero products launched is on purpose. This
+> repository is the engine and the methodology, with a deterministic demo and a full test
+> suite; the specific opportunities and research produced by operating it are kept private.
 
 ---
 
 ## The core: a creative discovery loop
 
-Detection is easy and crowded — scrape complaints, rank by volume, ship the top one. EIDOS
-treats discovery as a *generative* problem instead:
+EIDOS treats discovery as a *generative* problem, not a detection one:
 
 - **Compound, don't just collect.** Weak signals from different domains are combined into
   candidates that no single source would suggest.
@@ -112,11 +110,10 @@ workers, so it needs no API keys or network.
 
 ## How this was built
 
-EIDOS was built by an autonomous agent operating under the governance contract in this
-repo — the same gates and evidence rules it enforces on opportunities. Most commits are
-authored by that operator ("EIDOS Operator"); a human reviews and commits each one. That
-orchestration — an agent that shows its evidence and stops at human gates — is itself part
-of what the project is about.
+EIDOS was built by an autonomous agent operating under the same governance contract it
+enforces on opportunities — it shows its evidence and stops at every human gate, and a
+human reviews and commits each change. A few commits retain the "EIDOS Operator" author
+the agent ran as.
 
 ## License
 
