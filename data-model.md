@@ -1,14 +1,10 @@
-# Data Model Draft v0.3
+# Data Model
 
-> Status: Draft — change cadence: **constantly**, for the first few months.
->
-> This document is intentionally optimized for speed of iteration.
-> Schemas are expected to change frequently during early development.
-> Stability of concepts matters more than stability of fields.
+> Concepts here are stable; fields favor extensibility and are versioned per schema so
+> they can evolve without breaking old records.
 >
 > This doc owns the canonical lifecycle states and transition rules as policy;
 > the transition table in `core/state_machine.py` is the canonical implementation.
-> Code and doc agree as of v0.3 (2026-06-09).
 
 ---
 
@@ -53,7 +49,7 @@ Represents a potential business opportunity.
 where a solution could ship — a *scoping-time decision*, empty early. The same pain
 seen in Shopify forums might best ship as a Chrome extension; binding one venue at
 discovery forecloses that choice. `directive_id` = the human intent that spawned this
-(null for standing harvest; `source: human` seeds skip discovery entirely).
+(null for standing harvest; `source: human` seeds skip the discovery loop and start directly at the DISCOVERED state).
 
 ```json
 {
@@ -319,8 +315,8 @@ Stored derived values drift; the event log cannot ("never rely on current state 
 
 Spending is two-phase: `BUDGET_RESERVED(estimate)` gates the work *before* it runs;
 `BUDGET_SETTLED(actual)` records what it really cost on completion. Consumed = settled
-+ outstanding reserves. Books that record estimates forever can't compute "forecast
-accuracy" — a stated success metric.
++ outstanding reserves. If the books never recorded actuals, forecast accuracy — a stated
+success metric — could not be computed.
 
 ---
 
@@ -437,7 +433,8 @@ states — adding a worker must never require state-machine surgery (the litmus 
 - READY — passed the target venue's release bar
 - LAUNCHED — shipped; a Product is born with this opportunity as provenance.
   The opportunity's story ends here. Operations belong to the Product.
-- ON_HOLD — shelved by the portfolio; remembers and returns to the state it left
+- ON_HOLD — shelved by a portfolio decision (a human action, like every gate);
+  remembers and returns to the state it left
 
 ## Opportunity Terminal
 
@@ -448,7 +445,7 @@ states — adding a worker must never require state-machine surgery (the litmus 
 - REJECTED_STRATEGIC_MISALIGNMENT
 - ARCHIVED
 
-REJECTED_* is dormant, not dead: an explicit REOPEN (human or portfolio manager only)
+REJECTED_* is dormant, not dead: an explicit REOPEN (a human action — direct, or via portfolio review)
 re-enters at TRIAGED with full history retained — markets shift, and "never deleted"
 means revivable. ARCHIVED is truly frozen.
 
@@ -471,10 +468,6 @@ in `core/state_machine.py`):
 - REOPEN: REJECTED_* → TRIAGED, human/portfolio actors only.
 - "Re-evaluate" is a re-score in place at EVALUATED, not a state change.
 - Every blocked transition attempt is also an event — failed attempts are evidence too.
-
-v0.1 → v0.3 mapping: CLASSIFIED/VETTED → TRIAGED (+ discovery data) · the three
-*_VALIDATED states → VALIDATED (+ checklist) · SCOPED/PLANNED/DESIGNED/BUILDING/QA →
-BUILDING (+ execution data) · OPERATING → the Product.
 
 ---
 
